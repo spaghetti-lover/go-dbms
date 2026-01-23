@@ -5,23 +5,19 @@
 ![alt text](image.png)
 
 - Transport:
-
   - **Cluster Communication**: Manage communication between nodes.
   - **Client Communication**: Receive query from users.
 
 - Query Processor:
-
   - **Query Cache**: Store result of queries
   - **Query Parser**: Parse and check syntax error
   - **Query Optimizer**: Remove redundant and choose execution plan
 
 - Execution Engine:
-
   - **Remote Execution**
   - **Local Execution**
 
 - Storage Engine:
-
   - **Transaction Manager**: Manage transaction
   - **Lock Manager**: Manage lock to ensure data integrity when there are concurrent transactions
   - **Access Method / Index data structure**: Defines how data is physically stored, retrieved, and manipulated on disk (B+ Tree, Heap files)
@@ -259,4 +255,57 @@ To do that, we have the following data structures:
 ### When
 
 - Write heavy workload: Time-Series Data, Logging Systems, Messange Queues,...
+
+# Disk-based data structure
+
+- Data structure is designed to store directly on disk (HDD/SSD), not just in RAM
+
+## Why
+
+- **Persistence:** Data persists even after the system powers off
+- **High Capacity:** Theses structures handle datasets that exceed RAM capacity by utilizing larger disk space
+- **Performance:** B+ Trees optimize performance by fitting each node into a single disk page. This reduces tree height and minimizes expensive disk I/O operations
+
+## How
+
+### Option 1: Serializing the entire B+Tree
+
+#### Cons
+
+- Need to write / load for every operations
+- Wasteful disk I/O (load unused node, write unchanged node)
+- Full DB might not fit into memory
+
+#### Note
+
+- **Serialize:** Converts in-memory data structures into a byte stream for storage or transmission
+- **Deserialize:** Reconstructs in-memory data structures from a byte stream
+
+### Option 2: Page layout for B+Tree
+
+#### What
+
+- Page layout for B+Tree:
+  - **Page:** A node with fixed size
+  - **Page size:** Often multiply of 4KB (e.g. 8KB, 16KB), standard size of data chunks used by modern hard drives and file systems.
+  - **Optimization:** Try to fit as much data into the 4 KB page for best performance
+
+- Data persistent strategy:
+  - **Copy-on-write:** Avoid modifying existing data. Instead, create and update a copy of the target node
+  - **Path copying:** When a leaf node changes, create new copies of its parent nodes up to the root. This results in a new root pointer while preserving the old tree version.
+
+- File layout
+  - **Single-file structure:** The database resides in one file partitioned into pages.
+  - **Page types:**
+    - **Meta page:** The first page (Page 0), storing the latest root pointer and auxiliary metadata (root_ptr, page_used, page size, magic number, version,...).
+    - **Node pages:** All subsequent pages, each storing a B+Tree node.
+    ![alt text](image-2.png)
+
+#### How
+
+- Internal page:
+  - Keys right now is int, need to change to support bytes
+  - Children is an array of pointer -> u64
+  - Need a header that store the data type + next node
+  ![alt text](image-3.png)
 

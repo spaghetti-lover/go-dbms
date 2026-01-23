@@ -1,10 +1,13 @@
 package index
 
-import "github.com/spaghetti-lover/go-db/internal/utils"
+import (
+	"github.com/spaghetti-lover/go-db/internal/config"
+	"github.com/spaghetti-lover/go-db/internal/utils"
+)
 
 const (
-	maxKeys     = 4
-	maxChildren = maxKeys + 1
+	MAX_KEYS     = config.MAX_KEYS
+	MAX_CHILDREN = config.MAX_CHILDREN
 )
 
 type BPlusTreeNode interface {
@@ -12,8 +15,8 @@ type BPlusTreeNode interface {
 
 type BPlusTreeInternalNode struct {
 	nkey     int
-	keys     [maxKeys]int
-	children [maxChildren + 1]BPlusTreeNode
+	keys     [MAX_KEYS]int
+	children [MAX_CHILDREN]BPlusTreeNode
 }
 
 func NewBPlusTreeInternalNode() *BPlusTreeInternalNode {
@@ -21,7 +24,7 @@ func NewBPlusTreeInternalNode() *BPlusTreeInternalNode {
 }
 
 func (n *BPlusTreeInternalNode) isFull() bool {
-	return n.nkey >= maxKeys
+	return n.nkey >= MAX_KEYS
 }
 
 func (n *BPlusTreeInternalNode) InsertKV(key int, child BPlusTreeNode) {
@@ -51,14 +54,15 @@ func (n *BPlusTreeInternalNode) Split() (int, *BPlusTreeInternalNode) {
 	promotedKey := n.keys[mid]
 
 	right := NewBPlusTreeInternalNode()
+
 	for i := mid + 1; i < n.nkey; i++ {
 		right.keys[i-mid-1] = n.keys[i]
+	}
+
+	for i := mid + 1; i <= n.nkey; i++ {
 		right.children[i-mid-1] = n.children[i]
 	}
 
-	for i := mid + 1; i < n.nkey+1; i++ {
-		right.children[i-mid-1] = n.children[i-1]
-	}
 	right.nkey = n.nkey - mid - 1
 	n.nkey = mid
 
@@ -67,8 +71,8 @@ func (n *BPlusTreeInternalNode) Split() (int, *BPlusTreeInternalNode) {
 
 type BPlusTreeLeafNode struct {
 	nkey   int
-	keys   [maxKeys]int
-	values [maxKeys]int
+	keys   [MAX_KEYS]int
+	values [MAX_KEYS]int
 }
 
 func NewBPlusTreeLeafNode() *BPlusTreeLeafNode {
@@ -76,7 +80,7 @@ func NewBPlusTreeLeafNode() *BPlusTreeLeafNode {
 }
 
 func (n *BPlusTreeLeafNode) isFull() bool {
-	return n.nkey >= maxKeys
+	return n.nkey >= MAX_KEYS
 }
 
 func (n *BPlusTreeLeafNode) InsertKV(key int, val int) {
@@ -93,7 +97,7 @@ func (n *BPlusTreeLeafNode) InsertKV(key int, val int) {
 	}
 
 	// Shift and insert
-	if n.nkey < maxKeys {
+	if n.nkey < MAX_KEYS {
 		for i := n.nkey; i > idx+1; i-- {
 			n.keys[i] = n.keys[i-1]
 			n.values[i] = n.values[i-1]

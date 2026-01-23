@@ -36,8 +36,8 @@ func TestInternalNodeSplit(t *testing.T) {
 	node := NewBPlusTreeInternalNode()
 
 	// Setup: Create a full internal node
-	node.keys = [maxKeys]int{10, 20, 30, 40}
-	node.nkey = maxKeys
+	node.keys = [MAX_KEYS]int{10, 20, 30, 40}
+	node.nkey = MAX_KEYS
 
 	// Split
 	promotedKey, right := node.Split()
@@ -83,8 +83,8 @@ func TestLeafNodeSplit(t *testing.T) {
 	node := NewBPlusTreeLeafNode()
 
 	// Setup: Create a full internal node
-	node.keys = [maxKeys]int{10, 20, 30, 40}
-	node.nkey = maxKeys
+	node.keys = [MAX_KEYS]int{10, 20, 30, 40}
+	node.nkey = MAX_CHILDREN
 
 	// Split
 	right := node.Split()

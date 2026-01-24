@@ -9,7 +9,7 @@ import (
 )
 
 func TestInternalPage(t *testing.T) {
-	node := NewIPage()
+	node := NewBPlusTreeInternalPage()
 	var c uint64 = 0
 	key_3 := NewKeyEntryFromInt(3)
 	node.InsertKV(key_3, c)
@@ -57,7 +57,7 @@ func TestInternalPage(t *testing.T) {
 	err := node.writeToBuffer(buf)
 	require.NoError(t, err, "writeToBuffer should not error")
 
-	clonedNode := NewIPage()
+	clonedNode := NewBPlusTreeInternalPage()
 	err = clonedNode.readFromBuffer(buf)
 	require.NoError(t, err, "readFromBuffer should not error")
 
@@ -67,7 +67,7 @@ func TestInternalPage(t *testing.T) {
 }
 
 func TestNewIPage(t *testing.T) {
-	node := NewIPage()
+	node := NewBPlusTreeInternalPage()
 
 	assert.Equal(t, uint16(0), node.nkey, "new page should have 0 keys")
 	assert.Equal(t, uint8(1), node.header.pageType, "page type should be 1")
@@ -99,7 +99,7 @@ func TestKeyEntry_Serialization(t *testing.T) {
 }
 
 func TestBPlusTreeInternalPage_InsertKV_EmptyNode(t *testing.T) {
-	node := NewIPage()
+	node := NewBPlusTreeInternalPage()
 	key := NewKeyEntryFromInt(5)
 	var child uint64 = 100
 
@@ -111,7 +111,7 @@ func TestBPlusTreeInternalPage_InsertKV_EmptyNode(t *testing.T) {
 }
 
 func TestBPlusTreeInternalPage_InsertKV_MultipleAscending(t *testing.T) {
-	node := NewIPage()
+	node := NewBPlusTreeInternalPage()
 
 	key1 := NewKeyEntryFromInt(1)
 	key3 := NewKeyEntryFromInt(3)
@@ -128,7 +128,7 @@ func TestBPlusTreeInternalPage_InsertKV_MultipleAscending(t *testing.T) {
 }
 
 func TestBPlusTreeInternalPage_Split_EvenKeys(t *testing.T) {
-	node := NewIPage()
+	node := NewBPlusTreeInternalPage()
 
 	key1 := NewKeyEntryFromInt(1)
 	key2 := NewKeyEntryFromInt(2)

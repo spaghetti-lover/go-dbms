@@ -309,3 +309,39 @@ To do that, we have the following data structures:
   - Need a header that store the data type + next node
   ![alt text](image-3.png)
 
+- Leaf page:
+  - KeyVal struct:
+    ```Go
+    type KeyVal struct {
+      keyLen uint16
+      valLen uint16
+      keys   [MAX_KEY_SIZE]uint8 // BigEndian storage
+      vals   [MAX_KEY_SIZE]uint8 // BigEndian storage
+    }
+    ```
+
+    For simplicity, I can use only array keys and vals but i think using the KeyVal struct will simplify the process of tracking keys and vals at the same time
+
+  - `writeToBuffer` and `readFromBuffer` function is used to serialize / deserialize data into binary format at buffer
+    ```
+    // Write
+    PUT(key, val)
+      ↓
+    insert into B+Tree
+      ↓
+    KeyVal.writeToBuffer(pageBuffer)
+      ↓
+    flush page to disk
+    ```
+
+    ```
+    read page from disk
+      ↓
+    KeyVal.readFromBuffer(pageBuffer)
+      ↓
+    use key/value in query
+    ```
+
+- Page Allocator:
+
+- Insert function:

@@ -3,9 +3,11 @@ package disk
 import (
 	"bytes"
 	"encoding/binary"
+
+	"github.com/spaghetti-lover/go-db/internal/config"
 )
 
-const MAX_KEY_SIZE = 8
+const MAX_KEY_SIZE = config.MAX_KEY_SIZE
 
 // For example:
 // 3: [1, 7, 255]

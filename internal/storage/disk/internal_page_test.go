@@ -12,14 +12,14 @@ func TestInternalPage(t *testing.T) {
 	node := NewBPlusTreeInternalPage()
 	var c uint64 = 0
 	key_3 := NewKeyEntryFromInt(3)
-	node.InsertKV(key_3, c)
+	node.InsertKV(&key_3, c)
 
 	// [3]
 	assert.Equal(t, uint16(1), node.nkey, "nkey should be 1")
 	assert.Equal(t, 0, node.keys[0].compare(&key_3), "key[0] should be 3")
 
 	key_10 := NewKeyEntryFromInt(10)
-	node.InsertKV(key_10, c)
+	node.InsertKV(&key_10, c)
 
 	// [3, 10]
 	assert.Equal(t, uint16(2), node.nkey, "nkey should be 2")
@@ -27,7 +27,7 @@ func TestInternalPage(t *testing.T) {
 	assert.Equal(t, 0, node.keys[1].compare(&key_10), "key[1] should be 10")
 
 	key_5 := NewKeyEntryFromInt(5)
-	node.InsertKV(key_5, c)
+	node.InsertKV(&key_5, c)
 
 	// [3, 5, 10]
 	assert.Equal(t, uint16(3), node.nkey, "nkey should be 3")
@@ -36,7 +36,7 @@ func TestInternalPage(t *testing.T) {
 	assert.Equal(t, 0, node.keys[2].compare(&key_10), "key[2] should be 10")
 
 	key_12 := NewKeyEntryFromInt(12)
-	node.InsertKV(key_12, c)
+	node.InsertKV(&key_12, c)
 
 	assert.Equal(t, uint16(4), node.nkey, "nkey should be 4")
 
@@ -58,7 +58,7 @@ func TestInternalPage(t *testing.T) {
 	require.NoError(t, err, "writeToBuffer should not error")
 
 	clonedNode := NewBPlusTreeInternalPage()
-	err = clonedNode.readFromBuffer(buf)
+	err = clonedNode.readFromBuffer(buf, true)
 	require.NoError(t, err, "readFromBuffer should not error")
 
 	assert.Equal(t, uint16(2), clonedNode.nkey, "clonedNode nkey should be 2")
@@ -103,7 +103,7 @@ func TestBPlusTreeInternalPage_InsertKV_EmptyNode(t *testing.T) {
 	key := NewKeyEntryFromInt(5)
 	var child uint64 = 100
 
-	node.InsertKV(key, child)
+	node.InsertKV(&key, child)
 
 	assert.Equal(t, uint16(1), node.nkey, "nkey should be 1 after first insert")
 	assert.Equal(t, 0, node.keys[0].compare(&key), "first key should match")
@@ -117,9 +117,9 @@ func TestBPlusTreeInternalPage_InsertKV_MultipleAscending(t *testing.T) {
 	key3 := NewKeyEntryFromInt(3)
 	key5 := NewKeyEntryFromInt(5)
 
-	node.InsertKV(key1, 10)
-	node.InsertKV(key3, 30)
-	node.InsertKV(key5, 50)
+	node.InsertKV(&key1, 10)
+	node.InsertKV(&key3, 30)
+	node.InsertKV(&key5, 50)
 
 	assert.Equal(t, uint16(3), node.nkey, "nkey should be 3")
 	assert.Equal(t, 0, node.keys[0].compare(&key1), "keys should be in ascending order")
@@ -135,10 +135,10 @@ func TestBPlusTreeInternalPage_Split_EvenKeys(t *testing.T) {
 	key3 := NewKeyEntryFromInt(3)
 	key4 := NewKeyEntryFromInt(4)
 
-	node.InsertKV(key1, 10)
-	node.InsertKV(key2, 20)
-	node.InsertKV(key3, 30)
-	node.InsertKV(key4, 40)
+	node.InsertKV(&key1, 10)
+	node.InsertKV(&key2, 20)
+	node.InsertKV(&key3, 30)
+	node.InsertKV(&key4, 40)
 
 	newNode := node.Split()
 

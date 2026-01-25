@@ -39,9 +39,11 @@ func (p *BPlusTreeInternalPage) writeToBuffer(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (p *BPlusTreeInternalPage) readFromBuffer(buffer *bytes.Buffer) error {
-	if err := p.header.readFromBuffer(buffer); err != nil {
-		return err
+func (p *BPlusTreeInternalPage) readFromBuffer(buffer *bytes.Buffer, isReadHeader bool) error {
+	if isReadHeader {
+		if err := p.header.readFromBuffer(buffer); err != nil {
+			return err
+		}
 	}
 
 	if err := binary.Read(buffer, binary.BigEndian, &p.nkey); err != nil {
@@ -80,11 +82,11 @@ func NewBPlusTreeInternalPage() BPlusTreeInternalPage {
 }
 
 // Find last position so that the key <= find_key
-func (node *BPlusTreeInternalPage) FindLastLE(findKey KeyEntry) int {
+func (node *BPlusTreeInternalPage) FindLastLE(findKey *KeyEntry) int {
 	pos := -1
 
 	for i := 0; i < int(node.nkey); i++ {
-		if node.keys[i].compare(&findKey) <= 0 {
+		if node.keys[i].compare(findKey) <= 0 {
 			pos = i
 		}
 	}
@@ -93,7 +95,7 @@ func (node *BPlusTreeInternalPage) FindLastLE(findKey KeyEntry) int {
 }
 
 // Insert a key-children pair into the Internal Node
-func (node *BPlusTreeInternalPage) InsertKV(insertKey KeyEntry, insertChild uint64) {
+func (node *BPlusTreeInternalPage) InsertKV(insertKey *KeyEntry, insertChild uint64) {
 	// Find last less or equal as position to insert
 	pos := node.FindLastLE(insertKey)
 
@@ -105,7 +107,7 @@ func (node *BPlusTreeInternalPage) InsertKV(insertKey KeyEntry, insertChild uint
 		node.children[i] = node.children[i-1]
 	}
 
-	node.keys[pos+1] = insertKey
+	node.keys[pos+1] = *insertKey
 	node.children[pos+1] = insertChild
 	node.nkey += 1
 }

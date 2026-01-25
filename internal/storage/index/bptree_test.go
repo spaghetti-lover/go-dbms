@@ -84,7 +84,7 @@ func TestLeafNodeSplit(t *testing.T) {
 
 	// Setup: Create a full internal node
 	node.keys = [MAX_KEYS]int{10, 20, 30, 40}
-	node.nkey = MAX_CHILDREN
+	node.nkey = MAX_KEYS
 
 	// Split
 	right := node.Split()

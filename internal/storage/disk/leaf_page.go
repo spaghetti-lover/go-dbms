@@ -15,8 +15,38 @@ const LEAF_MAX_KV = config.LEAF_MAX_KV
 type KeyVal struct {
 	keyLen uint16
 	valLen uint16
-	keys   [MAX_KEY_SIZE]uint8 // BigEndian storage
-	vals   [MAX_KEY_SIZE]uint8 // BigEndian storage
+	key    [MAX_KEY_SIZE]uint8 // BigEndian storage
+	val    [MAX_KEY_SIZE]uint8 // BigEndian storage
+}
+
+func NewKeyValFromInt(inputKey int64, inputVal int64) KeyVal {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, inputKey)
+	dataSlice := buf.Bytes()
+	keyLen := len(dataSlice)
+
+	var key [MAX_KEY_SIZE]uint8
+
+	for i := MAX_KEY_SIZE - keyLen; i < MAX_KEY_SIZE; i++ {
+		key[i] = dataSlice[i-(MAX_KEY_SIZE-keyLen)] // data[10] = slice[0] | data[11] = slice[1]...
+	}
+
+	buf = new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, inputKey)
+	dataSlice = buf.Bytes()
+	valLen := len(dataSlice)
+
+	var val [MAX_VAL_SIZE]uint8
+	for i := MAX_VAL_SIZE - valLen; i < MAX_VAL_SIZE; i++ {
+		key[i] = dataSlice[i-(MAX_VAL_SIZE-valLen)] // data[10] = slice[0] | data[11] = slice[1] ...
+	}
+
+	return KeyVal{
+		keyLen: uint16(keyLen),
+		valLen: uint16(valLen),
+		key:    key,
+		val:    val,
+	}
 }
 
 func (k *KeyVal) writeToBuffer(buffer *bytes.Buffer) error {
@@ -29,13 +59,13 @@ func (k *KeyVal) writeToBuffer(buffer *bytes.Buffer) error {
 	}
 
 	for i := MAX_KEY_SIZE - int(k.keyLen); i < MAX_KEY_SIZE; i++ {
-		if err := binary.Write(buffer, binary.BigEndian, k.keys[i]); err != nil {
+		if err := binary.Write(buffer, binary.BigEndian, k.key[i]); err != nil {
 			return err
 		}
 	}
 
 	for i := MAX_VAL_SIZE - int(k.valLen); i < MAX_VAL_SIZE; i++ {
-		if err := binary.Write(buffer, binary.BigEndian, k.vals[i]); err != nil {
+		if err := binary.Write(buffer, binary.BigEndian, k.val[i]); err != nil {
 			return err
 		}
 	}
@@ -53,13 +83,13 @@ func (k *KeyVal) readFromBuffer(buffer *bytes.Buffer) error {
 	}
 
 	for i := MAX_KEY_SIZE - int(k.keyLen); i < MAX_KEY_SIZE; i++ {
-		if err := binary.Read(buffer, binary.BigEndian, k.keys[i]); err != nil {
+		if err := binary.Read(buffer, binary.BigEndian, k.key[i]); err != nil {
 			return err
 		}
 	}
 
 	for i := MAX_VAL_SIZE - int(k.valLen); i < MAX_VAL_SIZE; i++ {
-		if err := binary.Read(buffer, binary.BigEndian, k.vals[i]); err != nil {
+		if err := binary.Read(buffer, binary.BigEndian, k.val[i]); err != nil {
 			return err
 		}
 	}
@@ -69,10 +99,10 @@ func (k *KeyVal) readFromBuffer(buffer *bytes.Buffer) error {
 
 func (k *KeyVal) compare(keyVal *KeyVal) int {
 	for i := 0; i < MAX_KEY_SIZE; i += 1 {
-		if k.keys[i] < keyVal.keys[i] {
+		if k.key[i] < keyVal.key[i] {
 			return -1
 		}
-		if k.keys[i] > keyVal.keys[i] {
+		if k.key[i] > keyVal.key[i] {
 			return 1
 		}
 	}
@@ -116,9 +146,11 @@ func (p *BPlusTreeLeafPage) writeToBuffer(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (p *BPlusTreeLeafPage) readFromBuffer(buffer *bytes.Buffer) error {
-	if err := p.header.readFromBuffer(buffer); err != nil {
-		return err
+func (p *BPlusTreeLeafPage) readFromBuffer(buffer *bytes.Buffer, isReadHeader bool) error {
+	if isReadHeader {
+		if err := p.header.readFromBuffer(buffer); err != nil {
+			return err
+		}
 	}
 
 	if err := binary.Read(buffer, binary.BigEndian, p.nKeyValue); err != nil {
@@ -182,7 +214,7 @@ func (node *BPlusTreeLeafPage) Split() BPlusTreeLeafPage {
 
 	newNode := BPlusTreeLeafPage{
 		nKeyValue: node.nKeyValue - pos,
-		keyValue: newKV,
+		keyValue:  newKV,
 	}
 
 	node.nKeyValue = pos

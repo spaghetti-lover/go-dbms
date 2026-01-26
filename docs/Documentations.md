@@ -44,107 +44,6 @@
 - Access Method (B+ Tree, LSM Tree)
 - Recovery Manager (WAL)
 
-### Techstack
-
-- Go
-
-### Folder structure
-
-```
-database-from-scratch/
-│
-├── README.md                      # Overview, features, setup
-├── docs/                          # Documentation
-│   ├── architecture.md            # Nội dung hiện tại của bạn
-│   ├── query-language.md          # SQL syntax support
-│   ├── design-decisions.md        # Technical choices
-│   └── images/
-│       └── architecture.png
-│
-├── cmd/                           # Entry points
-│   ├── server/
-│   │   └── main.go               # Database server
-│   └── cli/
-│       └── main.go               # CLI client
-│
-├── pkg/                          # Public libraries
-│   └── protocol/                 # Wire protocol
-│
-├── internal/                     # Private application code
-│   │
-│   ├── transport/               # Transport Layer
-│   │   ├── client_comm.go       # Client communication handler
-│   │   └── protocol.go          # Message protocol
-│   │
-│   ├── query/                   # Query Processor
-│   │   ├── cache/
-│   │   │   ├── cache.go         # Query cache implementation
-│   │   │   └── lru.go           # LRU eviction policy
-│   │   ├── parser/
-│   │   │   ├── lexer.go         # Tokenizer
-│   │   │   ├── parser.go        # SQL parser
-│   │   │   └── ast.go           # Abstract syntax tree
-│   │   └── optimizer/
-│   │       ├── optimizer.go     # Query optimizer
-│   │       ├── rules.go         # Optimization rules
-│   │       └── planner.go       # Execution plan
-│   │
-│   ├── execution/               # Execution Engine
-│   │   ├── executor.go          # Main executor
-│   │   ├── operators/           # Query operators
-│   │   │   ├── scan.go
-│   │   │   ├── filter.go
-│   │   │   ├── join.go
-│   │   │   └── aggregate.go
-│   │   └── plan.go              # Physical plan
-│   │
-│   ├── storage/                 # Storage Engine
-│   │   ├── transaction/
-│   │   │   ├── manager.go       # Transaction manager
-│   │   │   └── isolation.go     # Isolation levels
-│   │   ├── lock/
-│   │   │   ├── manager.go       # Lock manager
-│   │   │   └── deadlock.go      # Deadlock detection
-│   │   ├── index/               # Access Methods
-│   │   │   ├── btree/
-│   │   │   │   ├── btree.go
-│   │   │   │   └── node.go
-│   │   │   └── lsm/
-│   │   │       ├── lsm.go
-│   │   │       └── memtable.go
-│   │   ├── buffer/
-│   │   │   ├── pool.go          # Buffer pool manager
-│   │   │   └── page.go          # Page structure
-│   │   ├── recovery/
-│   │   │   ├── wal.go           # Write-ahead log
-│   │   │   └── checkpoint.go    # Checkpoint manager
-│   │   └── disk/
-│   │       ├── manager.go       # Disk manager
-│   │       └── page.go          # Page layout
-│   │
-│   └── common/                  # Shared utilities
-│       ├── types.go             # Common types
-│       ├── config.go            # Configuration
-│       └── errors.go            # Error definitions
-│
-├── test/                        # Integration tests
-│   ├── query_test.go
-│   ├── transaction_test.go
-│   └── recovery_test.go
-│
-├── scripts/                     # Utility scripts
-│   ├── benchmark.sh
-│   └── setup.sh
-│
-├── examples/                    # Usage examples
-│   └── quickstart.go
-│
-├── go.mod
-├── go.sum
-├── Makefile                     # Build commands
-└── .gitignore
-```
-
 # Access Method / Indexing Data Structure
 
 To store data effectively, we need to optimize CRUD operations while minimizing disk access:
@@ -343,5 +242,99 @@ To do that, we have the following data structures:
     ```
 
 - Page Allocator:
+  - What: function return pointer to write data to
+
+  - Why:
+
+    - We know where is EOF to allocate data
+  - How:
+
+    1. Cache old pointer to the end of file
+    2. Update last pointer = old pointer + 4096
+    3. Return old pointer
+
+- InsertResult:
+  - What:
+    - `nodePointer`: pointer (offset) to current node after inserting (or splitting)
+    - `nodePromotionKey`: first key (smallest key) of the node
+    - `newNodePointer`: if node is splited, this pointer will point to the new node
+    - `newPromotionKey`: if node is splited, this key is the first key of new node and pushed to parent
+
+  - Why: Transmit info of insert result to parent in order to update B+ Tree
+
+- `readBlockAtPointer`
+  - What: Funciton read a block of data (4096 bytes) from a file at a specified pointer (offset) into a buffer.
+  - Why: To efficiently access any page (node) in the B+ Tree stored on disk, enabling reading of internal, leaf, or meta page as needed for tree operations
+  - How:
+
+    1. Resets the buffer
+    2. Creates a 4096-byte slice
+    3. Uses `file.ReadAt(data, int64(pointer))` to read exactly 4096 bytes from the file at the given offset
+    4. Writes the data into the buffer for further processing
+
+- Insert recursive function:
+
+  ```
+  FUNCTION InsertRecursive(node, key, keyValue):
+
+    IF node is InternalPage:
+
+        pos ← find child index where node.keys[pos] ≤ key
+
+        IF node is empty:
+            leaf ← new LeafPage
+            leaf.insert(keyValue)
+            leafPtr ← write leaf to disk
+            node.insert(key, leafPtr)
+            RETURN result(node)
+
+        IF pos == -1:
+            pos ← 0
+
+        childPtr ← node.children[pos]
+        child ← read page from disk at childPtr
+
+        result ← InsertRecursive(child, key, keyValue)
+
+        node.keys[pos] ← result.promotedKey
+        node.children[pos] ← result.nodePtr
+
+        IF result.newNodePtr exists:
+            node.insert(result.newPromotedKey, result.newNodePtr)
+
+        IF node is full:
+            newNode ← split node
+            oldPtr ← write node to disk
+            newPtr ← write newNode to disk
+            RETURN (oldPtr, promote(node), newPtr, promote(newNode))
+        ELSE:
+            ptr ← write node to disk
+            RETURN (ptr, promote(node), null)
+
+    ELSE:  // node is LeafPage
+
+        node.insert(keyValue)
+
+        IF node is full:
+            newLeaf ← split node
+            oldPtr ← write node to disk
+            newPtr ← write newLeaf to disk
+            RETURN (oldPtr, firstKey(node), newPtr, firstKey(newLeaf))
+        ELSE:
+            ptr ← write node to disk
+            RETURN (ptr, firstKey(node), null)
+
+  ```
 
 - Insert function:
+  - What:
+    - Add a key-value pair to the disk-based B+Tree
+    - Handle file access
+    - Read/write page
+    - Update tree structure as needed
+
+  - Why:
+    - Persistently store new data in B+ Tree index
+
+  - How
+![alt text](image-4.png)

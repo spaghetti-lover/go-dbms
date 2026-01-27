@@ -35,14 +35,14 @@ func rightAlignCopy(dst []byte, src []byte) {
 
 // From int64 key/value (BigEndian, sortable)
 func NewKeyValFromInt(k, v int64) KeyVal {
-	var keyBuf [MAX_KEY_SIZE]byte
-	var valBuf [MAX_VAL_SIZE]byte
+	var key [MAX_KEY_SIZE]uint8
+	var val [MAX_VAL_SIZE]uint8
+
+	var keyBuf [8]byte
+	var valBuf [8]byte
 
 	binary.BigEndian.PutUint64(keyBuf[:], uint64(k))
 	binary.BigEndian.PutUint64(valBuf[:], uint64(v))
-
-	var key [MAX_KEY_SIZE]uint8
-	var val [MAX_VAL_SIZE]uint8
 
 	rightAlignCopy(key[:], keyBuf[:])
 	rightAlignCopy(val[:], valBuf[:])

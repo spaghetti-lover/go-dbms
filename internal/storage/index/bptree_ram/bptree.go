@@ -1,14 +1,14 @@
 package bptree_ram
 
 import (
-	"github.com/spaghetti-lover/go-db/internal/config"
 	"github.com/spaghetti-lover/go-db/internal/utils"
 )
 
 const (
-	MAX_KEYS     = config.MAX_KEYS
-	MAX_CHILDREN = config.MAX_CHILDREN
+	MAX_KEYS     = 4
+	MAX_CHILDREN = MAX_KEYS + 1
 )
+
 type BPlusTree struct {
 	root BPlusTreeNode
 }

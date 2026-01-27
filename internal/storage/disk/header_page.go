@@ -40,6 +40,7 @@ func (h *PageHeader) ReadFromBuffer(buf *bytes.Buffer) error {
 
 	if err := binary.Read(buf, binary.BigEndian, &h.NextPagePointer); err != nil {
 		return err
+
 	}
 
 	return nil

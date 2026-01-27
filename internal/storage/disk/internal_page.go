@@ -3,16 +3,19 @@ package disk
 import (
 	"bytes"
 	"encoding/binary"
+)
 
-	"github.com/spaghetti-lover/go-db/internal/config"
+const (
+	MAX_INTERNAL_KEYS     = 4
+	MAX_INTERNAL_CHILDREN = MAX_INTERNAL_KEYS + 1
 )
 
 // [header | u8 u8 | k0 k1 k2 ... | 0 0 0 0 0 0 ... ]
 type InternalPage struct {
 	Header   PageHeader
 	NKeys    uint16
-	Keys     [config.MAX_KEYS]KeyEntry
-	Children [config.MAX_CHILDREN]uint64
+	Keys     [MAX_INTERNAL_KEYS]KeyEntry
+	Children [MAX_INTERNAL_CHILDREN]uint64
 }
 
 func (p *InternalPage) WriteToBuffer(buffer *bytes.Buffer) error {
@@ -67,8 +70,8 @@ func (p *InternalPage) ReadFromBuffer(buffer *bytes.Buffer, isReadHeader bool) e
 
 func NewInternalPage() *InternalPage {
 
-	var new_keys [config.MAX_KEYS]KeyEntry
-	var new_children [config.MAX_CHILDREN]uint64
+	var new_keys [MAX_INTERNAL_KEYS]KeyEntry
+	var new_children [MAX_INTERNAL_CHILDREN]uint64
 
 	return &InternalPage{
 		NKeys:    0,
@@ -128,8 +131,8 @@ func (n *InternalPage) InsertKV(key *KeyEntry, rightChild uint64) {
 
 // Split a node into 2 equal part
 func (n *InternalPage) Split() (*InternalPage, *KeyEntry) {
-	var newKeys [config.MAX_KEYS]KeyEntry
-	var newChildren [config.MAX_CHILDREN]uint64
+	var newKeys [MAX_INTERNAL_KEYS]KeyEntry
+	var newChildren [MAX_INTERNAL_CHILDREN]uint64
 
 	mid := n.NKeys / 2
 
@@ -163,11 +166,11 @@ func (p *InternalPage) IsLeaf() bool {
 }
 
 func (p *InternalPage) IsOverflow() bool {
-	return p.NKeys > config.MAX_KEYS
+	return p.NKeys > MAX_INTERNAL_KEYS
 }
 
 func (p *InternalPage) MinKeys() uint16 {
-	return config.MAX_KEYS / 2
+	return MAX_INTERNAL_KEYS / 2
 }
 
 func (p *InternalPage) CanBorrow() bool {

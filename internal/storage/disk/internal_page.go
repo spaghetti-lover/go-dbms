@@ -94,44 +94,46 @@ func (n *InternalPage) FindLastLE(key *KeyEntry) int {
 }
 
 // Insert a key-children pair into the Internal Node
-func (n *InternalPage) InsertKV(key *KeyEntry, child uint64) {
+func (n *InternalPage) InsertKV(key *KeyEntry, rightChild uint64) {
 	pos := n.FindLastLE(key)
 
-	// Shift keys
+	// shift keys
 	for i := int(n.NKeys); i > pos+1; i-- {
 		n.Keys[i] = n.Keys[i-1]
 	}
 
-	// Shift children
-	for i := int(n.NKeys) + 1; i > pos+1; i-- {
+	// shift children
+	for i := int(n.NKeys) + 1; i > pos+2; i-- {
 		n.Children[i] = n.Children[i-1]
 	}
 
 	n.Keys[pos+1] = *key
-	n.Children[pos+1] = child
+	n.Children[pos+2] = rightChild
 	n.NKeys++
 }
 
-func (node *InternalPage) DelKVAtPos(pos int) {
-	for i := pos; i < int(node.NKeys)-1; i++ {
-		node.Keys[i] = node.Keys[i+1]
-	}
+// func (node *InternalPage) DelKVAtPos(pos int) {
+// 	for i := pos; i < int(node.NKeys)-1; i++ {
+// 		node.Keys[i] = node.Keys[i+1]
+// 	}
 
-	for i := pos + 1; i < int(node.NKeys); i++ {
-		node.Children[i] = node.Children[i+1]
-	}
+// 	for i := pos + 1; i < int(node.NKeys); i++ {
+// 		node.Children[i] = node.Children[i+1]
+// 	}
 
-	node.Keys[node.NKeys-1] = KeyEntry{}
-	node.Children[node.NKeys] = 0
-	node.NKeys -= 1
-}
+// 	node.Keys[node.NKeys-1] = KeyEntry{}
+// 	node.Children[node.NKeys] = 0
+// 	node.NKeys -= 1
+// }
 
 // Split a node into 2 equal part
-func (n *InternalPage) Split() InternalPage {
+func (n *InternalPage) Split() (*InternalPage, *KeyEntry) {
 	var newKeys [config.MAX_KEYS]KeyEntry
 	var newChildren [config.MAX_CHILDREN]uint64
 
 	mid := n.NKeys / 2
+
+	middleKey := n.Keys[mid]
 
 	// Move keys[mid..] → new node
 	for i := mid; i < n.NKeys; i++ {
@@ -153,9 +155,13 @@ func (n *InternalPage) Split() InternalPage {
 	}
 
 	n.NKeys = mid
-	return newNode
+	return &newNode, &middleKey
 }
 
 func (p *InternalPage) IsLeaf() bool {
 	return false
+}
+
+func (p *InternalPage) IsOverflow() bool {
+	return p.NKeys > config.MAX_KEYS
 }

@@ -6,6 +6,9 @@ import (
 	"fmt"
 )
 
+const MAX_KEY_SIZE = 8
+const MAX_VAL_SIZE = 8
+
 var ErrKeyNotFound = fmt.Errorf("key not found")
 
 // 3: [1, 7, 255]
@@ -98,6 +101,5 @@ func (kv *KeyVal) readFromBuffer(buf *bytes.Buffer) error {
 
 // Lexicographical compare (BigEndian sortable)
 func (kv *KeyVal) Compare(other *KeyVal) int {
-	start := MAX_KEY_SIZE - min(int(kv.KeyLen), int(other.KeyLen))
-	return bytes.Compare(kv.Key[start:], other.Key[start:])
+	return bytes.Compare(kv.Key[:], other.Key[:])
 }

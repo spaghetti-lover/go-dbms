@@ -99,7 +99,7 @@ func (p *LeafPage) DelKV(kv *KeyVal) {
 }
 
 // Split a node into 2 equal part
-func (p *LeafPage) Split() LeafPage {
+func (p *LeafPage) Split() (*LeafPage, *KeyEntry) {
 	mid := int(p.NKV / 2)
 	var newLeaf LeafPage
 	newLeaf.Header.PageType = PageTypeLeaf
@@ -113,9 +113,13 @@ func (p *LeafPage) Split() LeafPage {
 
 	p.NKV = uint16(mid)
 	p.Header.NextPagePointer = 0 // set when persisting
-	return newLeaf
+	return &newLeaf, &KeyEntry{Key: newLeaf.KVs[0].Key}
 }
 
 func (p *LeafPage) IsLeaf() bool {
 	return true
+}
+
+func (p *LeafPage) IsOverflow() bool {
+	return p.NKV > LEAF_MAX_KV
 }

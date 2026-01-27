@@ -82,10 +82,9 @@ func (t *BPlusTree) setRootPID(pid uint64) error {
 }
 
 type InsertResult struct {
-	LeftPID  uint64
-	LeftKey  disk.KeyEntry
-	RightPID uint64
-	RightKey disk.KeyEntry
+	Split      bool
+	PromoteKey *disk.KeyEntry
+	NewPID     uint64
 }
 
 type DeleteResult struct {

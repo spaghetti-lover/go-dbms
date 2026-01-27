@@ -2,6 +2,8 @@ package disk
 
 import "os"
 
+const BLOCK_SIZE = 4096
+
 // FileAllocator manages allocation of fixed-size blocks.
 // It works purely with block IDs, not byte offsets.
 type FileAllocator struct {

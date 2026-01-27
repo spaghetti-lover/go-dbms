@@ -20,6 +20,10 @@ type KeyVal struct {
 	Val    [MAX_VAL_SIZE]uint8 // BigEndian storage
 }
 
+func (kv *KeyVal) Value() []byte {
+	return kv.Val[:kv.ValLen]
+}
+
 // rightAlignCopy copies src to the end of dst slice
 func rightAlignCopy(dst []byte, src []byte) {
 	// For example:

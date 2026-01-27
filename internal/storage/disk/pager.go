@@ -69,3 +69,8 @@ func (p *Pager) FreePage(pageID uint64) {
 	delete(p.cache, pageID)
 	p.allocator.Free(pageID)
 }
+
+// Close closes the underlying file
+func (p *Pager) Close() error {
+	return p.file.Close()
+}

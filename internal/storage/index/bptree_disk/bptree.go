@@ -2,6 +2,7 @@ package bptree_disk
 
 import (
 	"bytes"
+	"os"
 
 	"github.com/spaghetti-lover/go-db/internal/storage/disk"
 )
@@ -61,6 +62,20 @@ func NewBPlusTree(pager *disk.Pager) (*BPlusTree, error) {
 		pager:   pager,
 		metaPID: metaPID,
 	}, nil
+}
+
+func Open(file string) (*BPlusTree, error) {
+	allocator := disk.NewFileAllocator()
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, err
+	}
+	pager := disk.NewPager(f, allocator)
+	return NewBPlusTree(pager)
+}
+
+func (t *BPlusTree) Close() error {
+	return t.pager.Close()
 }
 
 func (t *BPlusTree) rootPID() (uint64, error) {

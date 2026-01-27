@@ -6,8 +6,8 @@ import (
 	"fmt"
 )
 
-const MAX_KEY_SIZE = 8
-const MAX_VAL_SIZE = 8
+const MAX_KEY_SIZE = 16
+const MAX_VAL_SIZE = 32
 
 var ErrKeyNotFound = fmt.Errorf("key not found")
 

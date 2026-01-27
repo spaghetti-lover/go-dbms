@@ -198,7 +198,7 @@ To do that, we have the following data structures:
   - **Page types:**
     - **Meta page:** The first page (Page 0), storing the latest root pointer and auxiliary metadata (root_ptr, page_used, page size, magic number, version,...).
     - **Node pages:** All subsequent pages, each storing a B+Tree node.
-    ![alt text](image-2.png)
+      ![alt text](image-2.png)
 
 #### How
 
@@ -222,14 +222,16 @@ To do that, we have the following data structures:
 │           Disk            │
 └──────────────────────────┘
 ```
+
 - Internal page:
   - Keys right now is int, need to change to support bytes
   - Children is an array of pointer -> u64
   - Need a header that store the data type + next node
-  ![alt text](image-3.png)
+    ![alt text](image-3.png)
 
 - Leaf page:
   - KeyVal struct:
+
     ```Go
     type KeyVal struct {
       keyLen uint16
@@ -242,6 +244,7 @@ To do that, we have the following data structures:
     For simplicity, I can use only array keys and vals but i think using the KeyVal struct will simplify the process of tracking keys and vals at the same time
 
   - `writeToBuffer` and `readFromBuffer` function is used to serialize / deserialize data into binary format at buffer
+
     ```
     // Write
     PUT(key, val)
@@ -265,7 +268,6 @@ To do that, we have the following data structures:
   - What: function return pointer to write data to
 
   - Why:
-
     - We know where is EOF to allocate data
 
 - InsertResult:
@@ -281,7 +283,6 @@ To do that, we have the following data structures:
   - What: Funciton read a block of data (4096 bytes) from a file at a specified pointer (offset) into a buffer.
   - Why: To efficiently access any page (node) in the B+ Tree stored on disk, enabling reading of internal, leaf, or meta page as needed for tree operations
   - How:
-
     1. Resets the buffer
     2. Creates a 4096-byte slice
     3. Uses `file.ReadAt(data, int64(pointer))` to read exactly 4096 bytes from the file at the given offset
@@ -352,3 +353,55 @@ To do that, we have the following data structures:
     - Persistently store new data in B+ Tree index
 
 ![alt text](image-4.png)
+
+# Data organization
+
+- In a relational DB, data is modeled as 2D tables consisting of rows and columns
+  - Primary key is used to identify rows.
+  - Point query: Find a row by a given key.
+  - Range query: Find rows by a range; iterate the result in sorted order
+
+## Primary key
+- How to encode a row as a KeyValue?
+  - How to define primary key?
+    - Option 1:
+
+      ![alt text](image-5.png)
+      - Primary key: key
+      - All other columns: value
+
+    - Option 2:
+
+      ![alt text](image-6.png)
+
+      - Primary key: Auto generated ID
+      - All other columns: value
+
+    => Option 1 for simplicity
+
+- How to encode data to []byte?
+  - In the KV structure, our key/value is []byte. So we need a way to:
+    - Encoding a list of columns -> []byte
+    - From []byte -> columns values
+
+- What if we want secondary index?
+
+  ![alt text](image-7.png)
+
+  Use the same table and point secondary indexed key to primary key
+
+
+## Schemas
+
+- How to encode multiple table?
+
+  ![alt text](image-8.png)
+
+  - Option 1: Multiple KV stores
+  - Option 2: 1 KV store, different prefix
+
+## Tables
+
+## Records
+
+## CRUD

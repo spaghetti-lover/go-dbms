@@ -10,7 +10,7 @@ import (
 // [0 0 0 0 0 0 1 7 255]
 type KeyEntry struct {
 	KeyLen uint16
-	Key   [MAX_KEY_SIZE]byte
+	Key    [MAX_KEY_SIZE]byte
 }
 
 func NewKeyEntryFromInt(v int64) *KeyEntry {
@@ -22,7 +22,7 @@ func NewKeyEntryFromInt(v int64) *KeyEntry {
 
 	return &KeyEntry{
 		KeyLen: 8,
-		Key:   data,
+		Key:    data,
 	}
 }
 
@@ -34,7 +34,7 @@ func NewKeyEntryFromBytes(input []byte) *KeyEntry {
 
 	return &KeyEntry{
 		KeyLen: uint16(len(input)),
-		Key:   data,
+		Key:    data,
 	}
 }
 
@@ -59,11 +59,10 @@ func (k *KeyEntry) readFromBuffer(buf *bytes.Buffer) error {
 }
 
 func (k *KeyEntry) Compare(rhs *KeyEntry) int {
-	for i := 0; i < MAX_KEY_SIZE; i++ {
+	for i := 0; i < int(MAX_KEY_SIZE); i++ {
 		if k.Key[i] < rhs.Key[i] {
 			return -1
-		}
-		if k.Key[i] > rhs.Key[i] {
+		} else if k.Key[i] > rhs.Key[i] {
 			return 1
 		}
 	}

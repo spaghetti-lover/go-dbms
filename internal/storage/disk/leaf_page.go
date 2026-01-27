@@ -123,3 +123,31 @@ func (p *LeafPage) IsLeaf() bool {
 func (p *LeafPage) IsOverflow() bool {
 	return p.NKV > LEAF_MAX_KV
 }
+
+func (p *LeafPage) Delete(key *KeyEntry) bool {
+	pos := -1
+	for i := 0; i < int(p.NKV); i++ {
+		entry := &KeyEntry{KeyLen: p.KVs[i].KeyLen, Key: p.KVs[i].Key}
+		if entry.Compare(key) == 0 {
+			pos = i
+			break
+		}
+	}
+	if pos == -1 {
+		return false
+	}
+	for i := pos; i < int(p.NKV)-1; i++ {
+		p.KVs[i] = p.KVs[i+1]
+	}
+	p.KVs[p.NKV-1] = KeyVal{}
+	p.NKV--
+	return true
+}
+
+func (p *LeafPage) MinKeys() uint16 {
+	return LEAF_MAX_KV / 2
+}
+
+func (p *LeafPage) CanBorrow() bool {
+	return p.NKV > p.MinKeys()
+}

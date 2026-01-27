@@ -2,9 +2,12 @@ package bptree_disk
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/spaghetti-lover/go-db/internal/storage/disk"
 )
+
+var ErrDuplicateKey = fmt.Errorf("duplicate key")
 
 func (t *BPlusTree) Insert(key, value []byte) error {
 	kv := disk.NewKeyValFromBytes(key, value)
@@ -57,6 +60,13 @@ func (t *BPlusTree) insertRecursive(nodePID uint64, key *disk.KeyEntry, kv *disk
 
 	if node.IsLeaf() {
 		leaf := node.(*disk.LeafPage)
+
+		// Check duplicate key
+		for i := 0; i < int(leaf.NKV); i++ {
+			if leaf.KVs[i].Compare(kv) == 0 {
+				return InsertResult{}, ErrDuplicateKey
+			}
+		}
 
 		// 1. Insert KV into leaf
 		leaf.InsertKV(kv)

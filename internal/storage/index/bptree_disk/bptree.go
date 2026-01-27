@@ -87,7 +87,15 @@ type InsertResult struct {
 	NewPID     uint64
 }
 
+type MergeDir int
+
+const (
+	NoMerge MergeDir = iota
+	MergeLeft
+	MergeRight
+)
+
 type DeleteResult struct {
-	NodePID      uint64
-	PromotionKey disk.KeyEntry
+	Underflow bool
+	MergeDir  MergeDir
 }

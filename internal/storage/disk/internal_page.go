@@ -165,3 +165,11 @@ func (p *InternalPage) IsLeaf() bool {
 func (p *InternalPage) IsOverflow() bool {
 	return p.NKeys > config.MAX_KEYS
 }
+
+func (p *InternalPage) MinKeys() uint16 {
+	return config.MAX_KEYS / 2
+}
+
+func (p *InternalPage) CanBorrow() bool {
+	return p.NKeys > p.MinKeys()
+}

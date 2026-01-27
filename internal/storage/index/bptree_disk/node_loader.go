@@ -26,18 +26,10 @@ func (t *BPlusTree) loadNode(pid uint64) (Node, []byte, error) {
 
 	switch header.PageType {
 	case disk.PageTypeLeaf:
-		page := &disk.LeafPage{}
-		if err := page.ReadFromBuffer(reader, false); err != nil {
-			return nil, nil, err
-		}
-		return page, buf, nil
+		return t.loadLeaf(pid)
 
 	case disk.PageTypeInternal:
-		page := &disk.InternalPage{}
-		if err := page.ReadFromBuffer(reader, false); err != nil {
-			return nil, nil, err
-		}
-		return page, buf, nil
+		return t.loadInternal(pid)
 
 	default:
 		return nil, nil, fmt.Errorf("unknown page type: %d", header.PageType)

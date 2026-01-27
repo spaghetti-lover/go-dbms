@@ -1,4 +1,4 @@
-package index
+package bptree_ram
 
 import (
 	"testing"

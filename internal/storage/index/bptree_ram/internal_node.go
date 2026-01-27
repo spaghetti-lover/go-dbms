@@ -1,4 +1,4 @@
-package index
+package bptree_ram
 
 import "github.com/spaghetti-lover/go-db/internal/utils"
 

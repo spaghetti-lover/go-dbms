@@ -8,30 +8,30 @@ import (
 )
 
 // [header | u8 u8 | k0 k1 k2 ... | 0 0 0 0 0 0 ... ]
-type BPlusTreeInternalPage struct {
-	header   PageHeader
-	nkey     uint16
-	keys     [config.MAX_KEYS]KeyEntry
-	children [config.MAX_CHILDREN]uint64
+type InternalPage struct {
+	Header   PageHeader
+	NKeys    uint16
+	Keys     [config.MAX_KEYS]KeyEntry
+	Children [config.MAX_CHILDREN]uint64
 }
 
-func (p *BPlusTreeInternalPage) writeToBuffer(buffer *bytes.Buffer) error {
-	if err := p.header.writeToBuffer(buffer); err != nil {
+func (p *InternalPage) WriteToBuffer(buffer *bytes.Buffer) error {
+	if err := p.Header.WriteToBuffer(buffer); err != nil {
 		return err
 	}
 
-	if err := binary.Write(buffer, binary.BigEndian, p.nkey); err != nil {
+	if err := binary.Write(buffer, binary.BigEndian, p.NKeys); err != nil {
 		return err
 	}
 
-	for i := 0; i < int(p.nkey); i += 1 {
-		if err := p.keys[i].writeToBuffer(buffer); err != nil {
+	for i := 0; i < int(p.NKeys); i += 1 {
+		if err := p.Keys[i].writeToBuffer(buffer); err != nil {
 			return err
 		}
 	}
 
-	for i := 0; i <= int(p.nkey); i += 1 {
-		if err := binary.Write(buffer, binary.BigEndian, p.children[i]); err != nil {
+	for i := 0; i <= int(p.NKeys); i += 1 {
+		if err := binary.Write(buffer, binary.BigEndian, p.Children[i]); err != nil {
 			return err
 		}
 	}
@@ -39,25 +39,25 @@ func (p *BPlusTreeInternalPage) writeToBuffer(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (p *BPlusTreeInternalPage) readFromBuffer(buffer *bytes.Buffer, isReadHeader bool) error {
+func (p *InternalPage) ReadFromBuffer(buffer *bytes.Buffer, isReadHeader bool) error {
 	if isReadHeader {
-		if err := p.header.readFromBuffer(buffer); err != nil {
+		if err := p.Header.ReadFromBuffer(buffer); err != nil {
 			return err
 		}
 	}
 
-	if err := binary.Read(buffer, binary.BigEndian, &p.nkey); err != nil {
+	if err := binary.Read(buffer, binary.BigEndian, &p.NKeys); err != nil {
 		return err
 	}
 
-	for i := 0; i < int(p.nkey); i += 1 {
-		if err := p.keys[i].readFromBuffer(buffer); err != nil {
+	for i := 0; i < int(p.NKeys); i += 1 {
+		if err := p.Keys[i].readFromBuffer(buffer); err != nil {
 			return err
 		}
 	}
 
-	for i := 0; i <= int(p.nkey); i += 1 {
-		if err := binary.Read(buffer, binary.BigEndian, &p.children[i]); err != nil {
+	for i := 0; i <= int(p.NKeys); i += 1 {
+		if err := binary.Read(buffer, binary.BigEndian, &p.Children[i]); err != nil {
 			return err
 		}
 	}
@@ -65,84 +65,97 @@ func (p *BPlusTreeInternalPage) readFromBuffer(buffer *bytes.Buffer, isReadHeade
 	return nil
 }
 
-func NewBPlusTreeInternalPage() BPlusTreeInternalPage {
+func NewInternalPage() *InternalPage {
 
 	var new_keys [config.MAX_KEYS]KeyEntry
 	var new_children [config.MAX_CHILDREN]uint64
 
-	return BPlusTreeInternalPage{
-		nkey:     0,
-		keys:     new_keys,
-		children: new_children,
-		header: PageHeader{
-			pageType:        1,
-			nextPagePointer: 0,
+	return &InternalPage{
+		NKeys:    0,
+		Keys:     new_keys,
+		Children: new_children,
+		Header: PageHeader{
+			PageType:        PageTypeInternal,
+			NextPagePointer: 0,
 		},
 	}
 }
 
 // Find last position so that the key <= find_key
-func (node *BPlusTreeInternalPage) FindLastLE(findKey *KeyEntry) int {
+func (n *InternalPage) FindLastLE(key *KeyEntry) int {
 	pos := -1
-
-	for i := 0; i < int(node.nkey); i++ {
-		if node.keys[i].compare(findKey) <= 0 {
-			pos = i
+	for i := 0; i < int(n.NKeys); i++ {
+		if n.Keys[i].Compare(key) > 0 {
+			break
 		}
+		pos = i
 	}
-
 	return pos
 }
 
 // Insert a key-children pair into the Internal Node
-func (node *BPlusTreeInternalPage) InsertKV(insertKey *KeyEntry, insertChild uint64) {
-	// Find last less or equal as position to insert
-	pos := node.FindLastLE(insertKey)
+func (n *InternalPage) InsertKV(key *KeyEntry, child uint64) {
+	pos := n.FindLastLE(key)
 
-	for i := int(node.nkey); i > pos+1; i-- {
-		node.keys[i] = node.keys[i-1]
+	// Shift keys
+	for i := int(n.NKeys); i > pos+1; i-- {
+		n.Keys[i] = n.Keys[i-1]
 	}
 
-	for i := int(node.nkey) + 1; i > pos+1; i-- {
-		node.children[i] = node.children[i-1]
+	// Shift children
+	for i := int(n.NKeys) + 1; i > pos+1; i-- {
+		n.Children[i] = n.Children[i-1]
 	}
 
-	node.keys[pos+1] = *insertKey
-	node.children[pos+1] = insertChild
-	node.nkey += 1
+	n.Keys[pos+1] = *key
+	n.Children[pos+1] = child
+	n.NKeys++
+}
+
+func (node *InternalPage) DelKVAtPos(pos int) {
+	for i := pos; i < int(node.NKeys)-1; i++ {
+		node.Keys[i] = node.Keys[i+1]
+	}
+
+	for i := pos + 1; i < int(node.NKeys); i++ {
+		node.Children[i] = node.Children[i+1]
+	}
+
+	node.Keys[node.NKeys-1] = KeyEntry{}
+	node.Children[node.NKeys] = 0
+	node.NKeys -= 1
 }
 
 // Split a node into 2 equal part
-func (node *BPlusTreeInternalPage) Split() BPlusTreeInternalPage {
+func (n *InternalPage) Split() InternalPage {
 	var newKeys [config.MAX_KEYS]KeyEntry
 	var newChildren [config.MAX_CHILDREN]uint64
 
-	// Split in the middle
-	pos := node.nkey / 2
+	mid := n.NKeys / 2
 
-	// [1, 2, 0, 0] -> pos = 2
-	// [3, 4, 0, 0]
-
-	for i := pos; i < node.nkey; i++ {
-		newKeys[i-pos] = node.keys[i] // n[0] = n[2]
-		newChildren[i-pos] = node.children[i]
-		node.keys[i] = KeyEntry{}
-		node.children[i] = 0
+	// Move keys[mid..] → new node
+	for i := mid; i < n.NKeys; i++ {
+		newKeys[i-mid] = n.Keys[i]
+		n.Keys[i] = KeyEntry{}
 	}
 
-	newChildren[node.nkey-pos] = node.children[node.nkey]
-	node.children[node.nkey] = 0
-
-	newNode := BPlusTreeInternalPage{
-		header: PageHeader{
-			pageType:        1,
-			nextPagePointer: 0,
-		},
-		nkey:     node.nkey - pos,
-		keys:     newKeys,
-		children: newChildren,
+	// Move children[mid..]
+	for i := mid; i <= n.NKeys; i++ {
+		newChildren[i-mid] = n.Children[i]
+		n.Children[i] = 0
 	}
 
-	node.nkey = pos
+	newNode := InternalPage{
+		Header:   PageHeader{PageType: 1},
+		NKeys:    n.NKeys - mid,
+		Keys:     newKeys,
+		Children: newChildren,
+	}
+
+	n.NKeys = mid
 	return newNode
+}
+
+func (p *InternalPage) IsLeaf() bool {
+	return false
 }

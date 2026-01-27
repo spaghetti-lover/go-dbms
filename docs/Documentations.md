@@ -202,6 +202,26 @@ To do that, we have the following data structures:
 
 #### How
 
+```
+┌──────────────────────────┐
+│        B+Tree            │  ← logic dữ liệu (keys, split, merge)
+│  (Internal / Leaf node)  │
+└───────────▲──────────────┘
+            │ page abstraction
+┌───────────┴──────────────┐
+│           Pager           │  ← cache, read/write page
+│  (pageID ↔ memory page)  │
+└───────────▲──────────────┘
+            │ blockID
+┌───────────┴──────────────┐
+│        Allocator          │  ← cấp phát block ID
+│   (free list, next ID)   │
+└───────────▲──────────────┘
+            │ offset = id * BLOCK_SIZE
+┌───────────┴──────────────┐
+│           Disk            │
+└──────────────────────────┘
+```
 - Internal page:
   - Keys right now is int, need to change to support bytes
   - Children is an array of pointer -> u64
@@ -247,11 +267,6 @@ To do that, we have the following data structures:
   - Why:
 
     - We know where is EOF to allocate data
-  - How:
-
-    1. Cache old pointer to the end of file
-    2. Update last pointer = old pointer + 4096
-    3. Return old pointer
 
 - InsertResult:
   - What:
@@ -336,5 +351,4 @@ To do that, we have the following data structures:
   - Why:
     - Persistently store new data in B+ Tree index
 
-  - How
 ![alt text](image-4.png)

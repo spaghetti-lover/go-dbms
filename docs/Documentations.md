@@ -362,6 +362,7 @@ To do that, we have the following data structures:
   - Range query: Find rows by a range; iterate the result in sorted order
 
 ## Primary key
+
 - How to encode a row as a KeyValue?
   - How to define primary key?
     - Option 1:
@@ -373,7 +374,6 @@ To do that, we have the following data structures:
     - Option 2:
 
       ![alt text](image-6.png)
-
       - Primary key: Auto generated ID
       - All other columns: value
 
@@ -390,13 +390,11 @@ To do that, we have the following data structures:
 
   Use the same table and point secondary indexed key to primary key
 
-
 ## Schemas
 
 - How to encode multiple table?
 
   ![alt text](image-8.png)
-
   - Option 1: Multiple KV stores
   - Option 2: 1 KV store, different prefix
 
@@ -406,7 +404,7 @@ To do that, we have the following data structures:
 
 ## CRUD
 
-# Range Query
+## Range Query
 
 ✅ Fix splitLeaf + mergeLeaf
 
@@ -414,6 +412,7 @@ To do that, we have the following data structures:
 - Update nextPagePointer when leaf merge
 
 ✅ BIter struct
+
 - What:
   - `leafPID`: current page
   - `leaf`: loaded leaf
@@ -428,8 +427,8 @@ To do that, we have the following data structures:
   - leaf != nil
   - 0 <= idx < leaf.NKV
 
-
 ✅ SeekGE
+
 - What: Move iterator to first key >= target key
 - Why: To start range scan from the desired key
 - How:
@@ -438,6 +437,7 @@ To do that, we have the following data structures:
   - In leaf node, find first key >= target key, set idx
 
 ✅ Valid, Deref
+
 - What:
   - `Valid()`: Check if iterator is valid
   - `Deref()`: Get current KeyVal
@@ -448,6 +448,7 @@ To do that, we have the following data structures:
   - `Deref()`: return leaf.KVs[idx] if valid
 
 ✅ Next
+
 - What: Move iterator to next key
 - Why: To iterate through keys sequentially
 - How:
@@ -455,6 +456,7 @@ To do that, we have the following data structures:
   - If idx >= leaf.NKV, load next leaf using nextPagePointer
 
 ✅ DB.Scan
+
 - What: Perform range scan from startKey to endKey
 - Why: To retrieve all key-value pairs within a specified range
 - How:
@@ -462,3 +464,106 @@ To do that, we have the following data structures:
   - Iterate using `Next()` until key >= endKey
 
 ✅ Test range scan
+
+## Secondary index
+
+### Option 1:
+
+- Create a separate table for each secondary index
+- Each secondary index table maps secondary key -> primary key
+- Cons:
+  - Harder to maintain
+  - We would love to have the indexes encoded in the table
+
+=> We need a list of indexes on a table
+
+### Option 2:
+
+![alt text](image-9.png)
+
+- What:
+  - Store multiple indexes in the same table
+  - Each index maps indexed columns -> primary key
+  - Index entry structure:
+
+- Why:
+  - Pros:
+    - Easy to search columns that are not primary key
+    - Avoid maintaining multiple index tables
+
+  - Cons:
+    - Many duplicate indexes. For example: (c3), (c1, c3), (c2, c3) will turn into (c1, c2)
+
+- How:
+  ```go
+  Indexes: [][]string {
+  {"name"},
+  {"city", "age"},
+  }
+  ```
+
+### Option 3:
+
+- What:
+  - Trống trùng bằng cách thêm primary key vào secondary key
+
+- How:
+  - IndexDef + metadata
+    - What: Define index structure
+    - Why:
+      - Real index need more information: name of index, columns list, prefix(avoid duplicate index)
+      - Easy to extend in the future (e.g. unique index, full-text index,...)
+      - Support multiple indexes per table, each index can be composite of multiple columns
+    - How:
+      ```go
+      type IndexDef struct {
+          Name   string
+          Cols   []string
+          Prefix uint8
+      }
+      type TableDef struct {
+          ...
+          Indexes []IndexDef
+      }
+      ```
+
+  - Hook Insert/Delete:
+    - What: When inserting/deleting a row, also update secondary indexes
+    - Why: Keep indexes in sync with table data
+    - How:
+      - On Insert:
+        - For each index, extract indexed columns from row
+        - Create index key: indexed columns + primary key
+        - Insert into B+Tree index
+      - On Delete:
+        - For each index, extract indexed columns from row
+        - Create index key: indexed columns + primary key
+        - Delete from B+Tree index
+      - On Update:
+        - If indexed columns change:
+          - Delete old index entry
+          - Insert new index entry
+        - If non-indexed columns change:
+          - No action needed
+
+  - Scanner abstraction
+    - What: Provide a way to scan index entries
+    - Why: Support index-based queries
+    - How:
+      ```go
+      type Scanner struct {
+        iter     *BIter
+        mode     ScanMode
+        tableDef *TableDef
+        indexDef *IndexDef // nil if primary scan
+        db       *DB
+      }
+      ```
+      - Implement `Scan(startKey, endKey)` in B+Tree
+      - Use iterator to traverse index entries in range
+
+  - Test consistency:
+    - Insert -> Scan index
+    - Delete -> Scan index empty
+    - Update indexed col → index changed
+    - Update non-index col → index unchanged

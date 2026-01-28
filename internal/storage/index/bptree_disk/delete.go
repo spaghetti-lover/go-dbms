@@ -6,7 +6,7 @@ import (
 	"github.com/spaghetti-lover/go-db/internal/storage/disk"
 )
 
-func (t *BPlusTree) Delete(key []byte) (bool, error) {
+func (t *BPlusTree) Del(key []byte) (bool, error) {
 	rootPID, err := t.rootPID()
 	if err != nil {
 		return false, err

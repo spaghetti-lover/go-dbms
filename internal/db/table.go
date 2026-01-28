@@ -1,12 +1,20 @@
 package db
 
-// Table definition (schema)
-type TableDef struct {
+// Index definition
+type IndexDef struct {
 	Name   string
 	Cols   []string
-	Types  []ValueType
-	PKeyN  int   // number of primary key columns
-	Prefix uint8 // table prefix for key encoding
+	Prefix uint8
+}
+
+// Table definition (schema)
+type TableDef struct {
+	Name    string
+	Cols    []string
+	Types   []ValueType
+	PKeyN   int   // number of primary key columns
+	Prefix  uint8 // table prefix for key encoding
+	Indexes []IndexDef
 }
 
 // Internal tables

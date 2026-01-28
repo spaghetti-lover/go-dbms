@@ -15,7 +15,7 @@ func kv(key int) ([]byte, []byte) {
 	return []byte{byte(key)}, []byte{byte(key + 100)}
 }
 
-var fileName = "test_db.db"
+var fileName = "btree_disk.db"
 
 func setupBPlusTree(t *testing.T) *BPlusTree {
 	allocator := disk.NewFileAllocator()
@@ -47,7 +47,7 @@ func TestBPlusTree_Delete_Simple(t *testing.T) {
 	}
 
 	// delete
-	ok, err := tree.Delete(disk.NewKeyEntryFromBytes([]byte{3}).Key[:])
+	ok, err := tree.Del(disk.NewKeyEntryFromBytes([]byte{3}).Key[:])
 	require.NoError(t, err)
 	assert.True(t, ok)
 
@@ -68,7 +68,7 @@ func TestBPlusTree_Delete_NotFound(t *testing.T) {
 	k, v := kv(1)
 	require.NoError(t, tree.Insert(k, v))
 
-	ok, err := tree.Delete(disk.NewKeyEntryFromBytes([]byte{2}).Key[:])
+	ok, err := tree.Del(disk.NewKeyEntryFromBytes([]byte{2}).Key[:])
 	assert.NoError(t, err)
 	assert.False(t, ok)
 }
@@ -85,7 +85,7 @@ func TestBPlusTree_Delete_MergeAndRootShrink(t *testing.T) {
 
 	// Delete keys to cause merges and root shrink
 	for i := 1; i <= numInserts; i++ {
-		ok, err := tree.Delete(disk.NewKeyEntryFromBytes([]byte{byte(i)}).Key[:])
+		ok, err := tree.Del(disk.NewKeyEntryFromBytes([]byte{byte(i)}).Key[:])
 		require.NoError(t, err)
 		require.True(t, ok)
 	}

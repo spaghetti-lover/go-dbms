@@ -22,7 +22,8 @@ func (s *Scanner) Valid() bool {
 	if s.endKey == nil {
 		return true
 	}
-	return bytes.Compare(s.iter.Deref().Key[:s.iter.Deref().KeyLen], s.endKey) <= 0
+	kv := s.iter.Deref()
+	return bytes.Compare(kv.GetKey(), s.endKey) <= 0
 }
 
 // Next advances the iterator
@@ -35,14 +36,15 @@ func (s *Scanner) Deref() (*Record, error) {
 	if s.indexDef == nil {
 		// Primary scan: decode directly
 		kv := s.iter.Deref()
-		rec, err := decodeRecord(s.tableDef, kv.Key[:kv.KeyLen], kv.Val[:kv.ValLen])
+		rec, err := decodeRecord(s.tableDef, kv.GetKey(), kv.GetValue())
 		if err != nil {
 			return nil, err
 		}
 		return rec, nil
 	}
 	// Secondary index scan: extract PK from index key, fetch value from primary
-	idxKey := s.iter.Deref().Key[:s.iter.Deref().KeyLen]
+	kv := s.iter.Deref()
+	idxKey := kv.GetKey()
 	pk := extractPrimaryKeyFromIndexKey(idxKey, s.tableDef)
 	val, ok := s.db.KV.Get(pk)
 	if !ok {

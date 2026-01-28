@@ -20,6 +20,15 @@ type KeyVal struct {
 	Val    [MAX_VAL_SIZE]uint8 // BigEndian storage
 }
 
+func (kv *KeyVal) GetKey() []byte {
+	return kv.Key[MAX_KEY_SIZE-int(kv.KeyLen):]
+}
+
+func (kv *KeyVal) GetValue() []byte {
+	return kv.Val[MAX_VAL_SIZE-int(kv.ValLen):]
+}
+
+// Value returns the value bytes (for backward compatibility)
 func (kv *KeyVal) Value() []byte {
 	return kv.Val[:kv.ValLen]
 }

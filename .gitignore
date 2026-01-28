@@ -1,2 +1,4 @@
 test_db.db
 btree_disk.db
+test.db
+test.wal

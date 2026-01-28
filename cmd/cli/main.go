@@ -1,3 +1,5 @@
+// INSERT INTO t (k, v) VALUES (key, value);
+// SELECT v FROM t WHERE k = key;
 package main
 
 import (

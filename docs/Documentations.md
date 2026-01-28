@@ -569,8 +569,100 @@ To do that, we have the following data structures:
     - Update non-index col → index unchanged
 
 # Transaction
+- Copy-on-write is not enough to ensure Atomicity
 
+  ![alt text](image-10.png)
+
+  Because transaction have many operations beside 1 update (many updates)
+
+- KVTX struct:
+  ```go
+  type KVTX struct {
+    db *KV
+    meta []byte //for the rollback
+
+    // Concurrency control
+    snapshot []byte
+    pending []byte
+  }
+
+  // begin a transaction
+  func (kv *KV) Begin(tx *KVTX)
+
+  // end a transaction: commit updates; rollback on error
+  func (kv *KV) Commit(tx *KVTX) error {
+    return nil
+  }
+
+  func (kv *KV) Abort(tx *KVTX) {
+    writeMetaToDisk(tx.kv, tx.meta)
+  }
+
+  func (tx *KVTX) Get(key []byte) ([]byte, bool) {
+    
+  }
+  ```
+## Atomicity
+
+![alt text](image-12.png)
+
+## Durability
+
+![alt text](image-13.png)
+
+## Consistency
+
+![alt text](image-11.png)
+
+## Isolation
+
+![alt text](image-14.png)
 
 # Concurrency
+![alt text](image-20.png)
+![alt text](image-15.png)
+![alt text](image-16.png)
+![alt text](image-17.png)
+![alt text](image-18.png)
+![alt text](image-19.png)
+![alt text](image-21.png)
+
+```go
+// History and conflict detection
+type StoreKey struct {
+  key []byte
+}
+
+type CommittedTX struct {
+  version uint64
+  writes []StoreKey
+}
+
+func detectConflict(tx *KVTX, key []byte) bool {
+  for i := len(kv.history) - 1; i >= 0; i-- {
+    if !versionBefore(tx.version, kv.history[i].version) {
+      break
+    }
+
+    if rangesOverlap(kv.history[i].writes, key) {
+      return true
+    }
+  } 
+  return false
+}
+```
+
+- Snapshot style update
+- Transaction interface
+  - Begin by storing interface
+  - Concurrency control with reading back you own write
+
+# Isolation level
+- Read Uncommitted
+- Read Committed
+- Repeatable Read
+- Serializable
+
+=> We will implement Repeatable Read
 
 # Query Language

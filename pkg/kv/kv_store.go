@@ -7,27 +7,32 @@ type KVEngine interface {
 	Set(key, val []byte) error
 	Del(key []byte) (bool, error)
 	Close() error
+	Scan(startKey, endKey []byte, fn func(key, val []byte) bool) error
 }
 
 type KV struct {
-	fileName string
-	engine   KVEngine
+	Filename string
+	Engine   KVEngine
 }
 
 func NewKV(engine KVEngine) *KV {
-	return &KV{engine: engine}
+	return &KV{Engine: engine}
 }
 
 func (kv *KV) Get(key []byte) ([]byte, bool) {
-	return kv.engine.Get(key)
+	return kv.Engine.Get(key)
 }
 
 func (kv *KV) Set(key, val []byte) error {
-	return kv.engine.Set(key, val)
+	return kv.Engine.Set(key, val)
 }
 
 func (kv *KV) Del(key []byte) (bool, error) {
-	return kv.engine.Del(key)
+	return kv.Engine.Del(key)
+}
+
+func (kv *KV) Scan(startKey, endKey []byte, fn func(key, val []byte) bool) error {
+	return kv.Engine.Scan(startKey, endKey, fn)
 }
 
 func (kv *KV) Open(engineType, fileName string) error {
@@ -43,11 +48,11 @@ func (kv *KV) Open(engineType, fileName string) error {
 	if err != nil {
 		return err
 	}
-	kv.engine = engine
-	kv.fileName = fileName
+	kv.Engine = engine
+	kv.Filename = fileName
 	return nil
 }
 
 func (kv *KV) Close() error {
-	return kv.engine.Close()
+	return kv.Engine.Close()
 }

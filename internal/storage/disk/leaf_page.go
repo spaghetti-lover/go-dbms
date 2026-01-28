@@ -73,16 +73,33 @@ func (p *LeafPage) FindLastLE(kv *KeyVal) int {
 	return pos
 }
 
-// Insert a key-children pair into the Leaf Node
-func (p *LeafPage) InsertKV(kv *KeyVal) {
-	pos := p.FindLastLE(kv)
+func (p *LeafPage) LowerBound(key *KeyEntry) int {
+	l, r := 0, int(p.NKV)
+	for l < r {
+		m := (l + r) / 2
+		entry := KeyEntry{KeyLen: p.KVs[m].KeyLen, Key: p.KVs[m].Key}
+		if entry.Compare(key) < 0 {
+			l = m + 1
+		} else {
+			r = m
+		}
+	}
+	return l
+}
 
-	for i := int(p.NKV); i > pos+1; i-- {
+// Insert a key-children pair into the Leaf Node
+func (p *LeafPage) InsertKV(kv *KeyVal) bool {
+	if p.NKV >= LEAF_MAX_KV {
+		return false
+	}
+	pos := p.LowerBound(&KeyEntry{Key: kv.Key})
+
+	for i := int(p.NKV); i > pos; i-- {
 		p.KVs[i] = p.KVs[i-1]
 	}
-
-	p.KVs[pos+1] = *kv
+	p.KVs[pos] = *kv
 	p.NKV++
+	return true
 }
 
 // Delete a key val from Leaf Node
@@ -101,19 +118,19 @@ func (p *LeafPage) DelKV(kv *KeyVal) {
 // Split a node into 2 equal part
 func (p *LeafPage) Split() (*LeafPage, *KeyEntry) {
 	mid := int(p.NKV / 2)
-	var newLeaf LeafPage
-	newLeaf.Header.PageType = PageTypeLeaf
+	newLeaf := NewLeafPage()
 	newLeaf.Header.NextPagePointer = p.Header.NextPagePointer
 	newLeaf.NKV = p.NKV - uint16(mid)
-
 	for i := 0; i < int(newLeaf.NKV); i++ {
 		newLeaf.KVs[i] = p.KVs[mid+i]
 		p.KVs[mid+i] = KeyVal{}
 	}
-
 	p.NKV = uint16(mid)
-	p.Header.NextPagePointer = 0 // set when persisting
-	return &newLeaf, &KeyEntry{Key: newLeaf.KVs[0].Key}
+	sep := &KeyEntry{
+		KeyLen: newLeaf.KVs[0].KeyLen,
+		Key:    newLeaf.KVs[0].Key,
+	}
+	return newLeaf, sep
 }
 
 func (p *LeafPage) IsLeaf() bool {

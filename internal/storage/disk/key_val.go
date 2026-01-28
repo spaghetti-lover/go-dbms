@@ -24,12 +24,12 @@ func (kv *KeyVal) Value() []byte {
 	return kv.Val[:kv.ValLen]
 }
 
-// rightAlignCopy copies src to the end of dst slice
-func rightAlignCopy(dst []byte, src []byte) {
+// RightAlignCopy copies src to the end of dst slice
+func RightAlignCopy(dst []byte, src []byte) {
 	// For example:
 	// dst := make([]byte, 8)
 	// src := []byte{0x00, 0x00, 0x01, 0x2C}
-	// rightAlignCopy(dst, src) = [0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2C]
+	// RightAlignCopy(dst, src) = [0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2C]
 	copy(dst[len(dst)-len(src):], src)
 }
 
@@ -44,8 +44,8 @@ func NewKeyValFromInt(k, v int64) KeyVal {
 	binary.BigEndian.PutUint64(keyBuf[:], uint64(k))
 	binary.BigEndian.PutUint64(valBuf[:], uint64(v))
 
-	rightAlignCopy(key[:], keyBuf[:])
-	rightAlignCopy(val[:], valBuf[:])
+	RightAlignCopy(key[:], keyBuf[:])
+	RightAlignCopy(val[:], valBuf[:])
 
 	return KeyVal{
 		KeyLen: 8,
@@ -60,8 +60,8 @@ func NewKeyValFromBytes(k, v []byte) KeyVal {
 	var key [MAX_KEY_SIZE]uint8
 	var val [MAX_VAL_SIZE]uint8
 
-	rightAlignCopy(key[:], k)
-	rightAlignCopy(val[:], v)
+	RightAlignCopy(key[:], k)
+	RightAlignCopy(val[:], v)
 
 	return KeyVal{
 		KeyLen: uint16(len(k)),

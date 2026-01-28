@@ -50,7 +50,7 @@ func (db *DB) getByDef(tdef *TableDef, rec *Record) error {
 		return err
 	}
 
-	// Encode key from primary key values
+	// Encode key from primare *Record key values
 	key := encodeKey(tdef.Prefix, rec.Vals[:tdef.PKeyN])
 
 	// Get from KV store
@@ -68,6 +68,17 @@ func (db *DB) getByDef(tdef *TableDef, rec *Record) error {
 	// Fill in record values
 	copy(rec.Vals[tdef.PKeyN:], vals)
 	return nil
+}
+
+func getTableDef(db *DB, table string) *TableDef {
+	switch table {
+	case MetaTable.Name:
+		return MetaTable
+	case TableCatalog.Name:
+		return TableCatalog
+	default:
+		return nil
+	}
 }
 
 func (db *DB) insertByDef(tdef *TableDef, rec *Record) error {
@@ -133,6 +144,44 @@ func (db *DB) deleteByDef(tdef *TableDef, rec *Record) error {
 	return nil
 }
 
+func (db *DB) scanByDef(tdef *TableDef, startRec, endRec *Record, fn func(rec *Record) bool) error {
+	var startKey, endKey []byte
+	if startRec != nil {
+		if err := reorderRecord(tdef, startRec); err != nil {
+			return err
+		}
+		startKey = encodeKey(tdef.Prefix, startRec.Vals[:tdef.PKeyN])
+	}
+	if endRec != nil {
+		if err := reorderRecord(tdef, endRec); err != nil {
+			return err
+		}
+		endKey = encodeKey(tdef.Prefix, endRec.Vals[:tdef.PKeyN])
+	}
+
+	return db.KV.Scan(startKey, endKey, func(key, val []byte) bool {
+		rec := &Record{
+			Cols: append([]string{}, tdef.Cols...),
+			Vals: make([]Value, len(tdef.Cols)),
+		}
+		keyVals, err := decodeValue(key)
+		if err != nil {
+			return false
+		}
+		for i := 0; i < int(tdef.PKeyN); i++ {
+			rec.Vals[i] = keyVals[i]
+		}
+		valVals, err := decodeValue(val)
+		if err != nil {
+			return false
+		}
+		for i := int(tdef.PKeyN); i < len(tdef.Cols); i++ {
+			rec.Vals[i] = valVals[i-int(tdef.PKeyN)]
+		}
+		return fn(rec)
+	})
+}
+
 func (db *DB) Get(table *TableDef, rec *Record) error {
 	return db.getByDef(table, rec)
 }
@@ -155,4 +204,13 @@ func (db *DB) Upsert(table *TableDef, rec *Record) error {
 
 func (db *DB) Delete(table *TableDef, rec *Record) error {
 	return db.deleteByDef(table, rec)
+}
+
+func (db *DB) Scan(table string, startRec, endRec *Record, fn func(rec *Record) bool) error {
+	tdef := getTableDef(db, table)
+	if tdef == nil {
+		return errors.New("unknown table: " + table)
+	}
+
+	return db.scanByDef(tdef, startRec, endRec, fn)
 }

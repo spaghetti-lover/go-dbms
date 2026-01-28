@@ -30,6 +30,10 @@ func (e *BPTreeEngine) Del(key []byte) (bool, error) {
 	return e.tree.Delete(key)
 }
 
+func (e *BPTreeEngine) Scan(startKey, endKey []byte, fn func(key, val []byte) bool) error {
+	return e.tree.Scan(startKey, endKey, fn)
+}
+
 func (e *BPTreeEngine) Close() error {
 	return e.tree.Close()
 }

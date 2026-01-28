@@ -114,3 +114,76 @@ type DeleteResult struct {
 	Underflow bool
 	MergeDir  MergeDir
 }
+
+// SeekGE positions the iterator at the first key >= target key
+func (t *BPlusTree) SeekGE(key []byte) *BIter {
+	rootPID, err := t.rootPID()
+	if err != nil {
+		return &BIter{valid: false}
+	}
+
+	kv := &disk.KeyEntry{
+		KeyLen: uint16(len(key)),
+	}
+
+	disk.RightAlignCopy(kv.Key[:], key)
+
+	pid := rootPID
+
+	for {
+		node, _, err := t.loadNode(pid)
+		if err != nil {
+			return &BIter{valid: false}
+		}
+
+		if node.IsLeaf() {
+			leaf, buf, _ := t.loadLeaf(pid)
+
+			idx := 0
+			for idx < int(leaf.NKV) {
+				entry := &disk.KeyEntry{KeyLen: leaf.KVs[idx].KeyLen, Key: leaf.KVs[idx].Key}
+				if entry.Compare(kv) >= 0 {
+					break
+				}
+				idx++
+			}
+
+			// Case 1: found key >= target
+			if idx < int(leaf.NKV) {
+				return &BIter{
+					tree:    t,
+					leafPID: pid,
+					leaf:    leaf,
+					buf:     buf,
+					idx:     idx,
+					valid:   true,
+				}
+			}
+
+			// Case 2: not found, point to next leaf
+			next := leaf.Header.NextPagePointer
+			if next == 0 {
+				return &BIter{valid: false}
+			}
+
+			leaf, buf, _ = t.loadLeaf(next)
+			if leaf.NKV == 0 {
+				return &BIter{valid: false}
+			}
+
+			return &BIter{
+				tree:    t,
+				leafPID: next,
+				leaf:    leaf,
+				buf:     buf,
+				idx:     0,
+				valid:   true,
+			}
+		}
+
+		// internal node
+		internal := node.(*disk.InternalPage)
+		pos := internal.FindLastLE(kv)
+		pid = internal.Children[pos+1]
+	}
+}

@@ -366,7 +366,7 @@ func mergeLeaf(parent *disk.InternalPage, idx int, left *disk.LeafPage, cur *dis
 	// 2. link leaf chain
 	left.Header.NextPagePointer = cur.Header.NextPagePointer
 
-	// 3. remove separator key from parent
+	// 3. remove separator key (idx - 1) from parent
 	for i := idx - 1; i < int(parent.NKeys)-1; i++ {
 		parent.Keys[i] = parent.Keys[i+1]
 	}
@@ -376,10 +376,8 @@ func mergeLeaf(parent *disk.InternalPage, idx int, left *disk.LeafPage, cur *dis
 		parent.Children[i] = parent.Children[i+1]
 	}
 
+	parent.Children[parent.NKeys] = 0
 	parent.NKeys--
-
-	parent.Keys[parent.NKeys] = disk.KeyEntry{}
-	parent.Children[parent.NKeys+1] = 0
 }
 
 func updateSeparatorKey(parent *disk.InternalPage, childIdx int, newKey *disk.KeyEntry) {

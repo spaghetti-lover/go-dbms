@@ -405,3 +405,60 @@ To do that, we have the following data structures:
 ## Records
 
 ## CRUD
+
+# Range Query
+
+✅ Fix splitLeaf + mergeLeaf
+
+- Update nextPagePointer when leaf split
+- Update nextPagePointer when leaf merge
+
+✅ BIter struct
+- What:
+  - `leafPID`: current page
+  - `leaf`: loaded leaf
+  - `idx`: current idx of leaf.KV
+  - `valid`: alive not not
+
+- Why:
+  - To iterate over a range of keys in the B+ Tree efficiently
+
+- How: Ensure invariants
+  - valid == true
+  - leaf != nil
+  - 0 <= idx < leaf.NKV
+
+
+✅ SeekGE
+- What: Move iterator to first key >= target key
+- Why: To start range scan from the desired key
+- How:
+  - Start from root, traverse down to leaf
+  - In each internal node, find child pointer where key <= target key
+  - In leaf node, find first key >= target key, set idx
+
+✅ Valid, Deref
+- What:
+  - `Valid()`: Check if iterator is valid
+  - `Deref()`: Get current KeyVal
+- Why:
+  - To access current key-value and check iterator state
+- How:
+  - `Valid()`: return valid
+  - `Deref()`: return leaf.KVs[idx] if valid
+
+✅ Next
+- What: Move iterator to next key
+- Why: To iterate through keys sequentially
+- How:
+  - Increment idx
+  - If idx >= leaf.NKV, load next leaf using nextPagePointer
+
+✅ DB.Scan
+- What: Perform range scan from startKey to endKey
+- Why: To retrieve all key-value pairs within a specified range
+- How:
+  - Use `SeekGE(startKey)` to position iterator
+  - Iterate using `Next()` until key >= endKey
+
+✅ Test range scan

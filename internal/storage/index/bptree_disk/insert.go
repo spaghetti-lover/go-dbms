@@ -89,8 +89,10 @@ func (t *BPlusTree) insertRecursive(nodePID uint64, key *disk.KeyEntry, kv *disk
 		//   rightLeaf, promoteKey := leaf.Split()
 		//   promoteKey is FIRST KEY of right leaf
 		rightLeaf, promoteKey := leaf.Split()
-
 		rightPID, rightBuf := t.pager.NewPage()
+		oldNext := leaf.Header.NextPagePointer
+		leaf.Header.NextPagePointer = rightPID
+		rightLeaf.Header.NextPagePointer = oldNext
 		rightWriter := bytes.NewBuffer(rightBuf[:0])
 		if err := rightLeaf.WriteToBuffer(rightWriter); err != nil {
 			return InsertResult{}, err

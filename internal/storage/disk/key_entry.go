@@ -18,7 +18,7 @@ func NewKeyEntryFromInt(v int64) *KeyEntry {
 	binary.BigEndian.PutUint64(buf[:], uint64(v))
 
 	var data [MAX_KEY_SIZE]byte
-	rightAlignCopy(data[:], buf[:])
+	RightAlignCopy(data[:], buf[:])
 
 	return &KeyEntry{
 		KeyLen: 8,
@@ -30,7 +30,7 @@ func NewKeyEntryFromInt(v int64) *KeyEntry {
 // input  : [0 0 0 0 0 0 1 2]
 func NewKeyEntryFromBytes(input []byte) *KeyEntry {
 	var data [MAX_KEY_SIZE]byte
-	rightAlignCopy(data[:], input)
+	RightAlignCopy(data[:], input)
 
 	return &KeyEntry{
 		KeyLen: uint16(len(input)),

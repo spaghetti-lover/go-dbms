@@ -6,8 +6,8 @@ import (
 	"fmt"
 )
 
-const MAX_KEY_SIZE = 16
-const MAX_VAL_SIZE = 32
+const MAX_KEY_SIZE = 64
+const MAX_VAL_SIZE = 64
 
 var ErrKeyNotFound = fmt.Errorf("key not found")
 
@@ -20,17 +20,17 @@ type KeyVal struct {
 	Val    [MAX_VAL_SIZE]uint8 // BigEndian storage
 }
 
-func (kv *KeyVal) GetKey() []byte {
+func (kv *KeyVal) GetRightAlignedKey() []byte {
 	return kv.Key[MAX_KEY_SIZE-int(kv.KeyLen):]
 }
 
-func (kv *KeyVal) GetValue() []byte {
+func (kv *KeyVal) GetRightAlignedValue() []byte {
 	return kv.Val[MAX_VAL_SIZE-int(kv.ValLen):]
 }
 
 // Value returns the value bytes (for backward compatibility)
 func (kv *KeyVal) Value() []byte {
-	return kv.Val[:kv.ValLen]
+	return kv.GetRightAlignedValue()
 }
 
 // RightAlignCopy copies src to the end of dst slice

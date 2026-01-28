@@ -12,7 +12,7 @@ var (
 )
 
 type DB struct {
-	KV kv.KV
+	KV        kv.KV
 	TableDefs map[string]*TableDef
 }
 
@@ -246,11 +246,11 @@ func (db *DB) NewScanner(tdef *TableDef, indexDef *IndexDef, startRec, endRec *R
 	} else {
 		// Secondary index scan
 		idxVals := extractIndexedValues(indexDef, startRec) // take indexed cols only
-		pkMin := makeMinPK(tdef.PKeyN)
+		pkMin := makeMinPK(tdef)
 		startKey = encodeKey(indexDef.Prefix, append(idxVals, pkMin...))
 
 		idxValsEnd := extractIndexedValues(indexDef, endRec)
-		pkMax := makeMaxPK(tdef.PKeyN)
+		pkMax := makeMaxPK(tdef)
 		endKey = encodeKey(indexDef.Prefix, append(idxValsEnd, pkMax...))
 	}
 
@@ -266,6 +266,7 @@ func (db *DB) NewScanner(tdef *TableDef, indexDef *IndexDef, startRec, endRec *R
 		db:       db,
 		tableDef: tdef,
 		indexDef: indexDef,
+		startKey: startKey,
 		endKey:   endKey,
 	}, nil
 }

@@ -567,3 +567,10 @@ To do that, we have the following data structures:
     - Delete -> Scan index empty
     - Update indexed col → index changed
     - Update non-index col → index unchanged
+
+# Transaction
+
+
+# Concurrency
+
+# Query Language

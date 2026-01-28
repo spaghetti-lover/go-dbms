@@ -11,6 +11,7 @@ type Scanner struct {
 	db       *DB
 	tableDef *TableDef
 	indexDef *IndexDef // nil = primary scan
+	startKey []byte    // prefix for validation
 	endKey   []byte    // nil = no upper bound
 }
 
@@ -19,11 +20,16 @@ func (s *Scanner) Valid() bool {
 	if !s.iter.Valid() {
 		return false
 	}
+	kv := s.iter.Deref()
+	key := kv.GetRightAlignedKey()
+	// Check that key starts with the correct prefix
+	if len(key) == 0 || len(s.startKey) == 0 || key[0] != s.startKey[0] {
+		return false
+	}
 	if s.endKey == nil {
 		return true
 	}
-	kv := s.iter.Deref()
-	return bytes.Compare(kv.GetKey(), s.endKey) <= 0
+	return bytes.Compare(key, s.endKey) <= 0
 }
 
 // Next advances the iterator
@@ -36,7 +42,9 @@ func (s *Scanner) Deref() (*Record, error) {
 	if s.indexDef == nil {
 		// Primary scan: decode directly
 		kv := s.iter.Deref()
-		rec, err := decodeRecord(s.tableDef, kv.GetKey(), kv.GetValue())
+		key := kv.GetRightAlignedKey()
+		val := kv.GetRightAlignedValue()
+		rec, err := decodeRecord(s.tableDef, key, val)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +52,7 @@ func (s *Scanner) Deref() (*Record, error) {
 	}
 	// Secondary index scan: extract PK from index key, fetch value from primary
 	kv := s.iter.Deref()
-	idxKey := kv.GetKey()
+	idxKey := kv.GetRightAlignedKey()
 	pk := extractPrimaryKeyFromIndexKey(idxKey, s.tableDef)
 	val, ok := s.db.KV.Get(pk)
 	if !ok {
@@ -57,18 +65,28 @@ func (s *Scanner) Deref() (*Record, error) {
 	return rec, nil
 }
 
-func makeMinPK(n int) []Value {
-	vals := make([]Value, n)
-	for i := 0; i < n; i++ {
-		vals[i] = NewBytesValue([]byte{})
+func makeMinPK(tdef *TableDef) []Value {
+	vals := make([]Value, tdef.PKeyN)
+	for i := 0; i < int(tdef.PKeyN); i++ {
+		switch tdef.Types[i] {
+		case ValueInt64:
+			vals[i] = NewInt64Value(0)
+		case ValueBytes:
+			vals[i] = NewBytesValue([]byte{})
+		}
 	}
 	return vals
 }
 
-func makeMaxPK(n int) []Value {
-	vals := make([]Value, n)
-	for i := 0; i < n; i++ {
-		vals[i] = NewBytesValue(bytes.Repeat([]byte{0xFF}, 16))
+func makeMaxPK(tdef *TableDef) []Value {
+	vals := make([]Value, tdef.PKeyN)
+	for i := 0; i < int(tdef.PKeyN); i++ {
+		switch tdef.Types[i] {
+		case ValueInt64:
+			vals[i] = NewInt64Value(0x7FFFFFFFFFFFFFFF) // max int64
+		case ValueBytes:
+			vals[i] = NewBytesValue(bytes.Repeat([]byte{0xFF}, 16))
+		}
 	}
 	return vals
 }

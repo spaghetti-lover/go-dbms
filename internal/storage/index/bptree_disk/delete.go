@@ -15,7 +15,7 @@ func (t *BPlusTree) Del(key []byte) (bool, error) {
 	keyEntry := disk.KeyEntry{
 		KeyLen: uint16(len(key)),
 	}
-	copy(keyEntry.Key[:], key)
+	disk.RightAlignCopy(keyEntry.Key[:], key)
 
 	res, err := t.deleteRecursive(rootPID, &keyEntry)
 	if err != nil {

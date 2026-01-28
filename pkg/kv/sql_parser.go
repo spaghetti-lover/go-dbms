@@ -53,7 +53,10 @@ func ParseSQL(sql string) (SQLStmt, error) {
 			for _, cond := range conds {
 				parts := strings.SplitN(strings.TrimSpace(cond), "=", 2)
 				if len(parts) == 2 {
-					where[strings.TrimSpace(parts[0])] = strings.Trim(strings.TrimSpace(parts[1]), "'\"")
+					val := strings.TrimSpace(parts[1])
+					val = strings.Trim(val, "'\"")
+					val = strings.TrimRight(val, ";")
+					where[strings.TrimSpace(parts[0])] = val
 				}
 			}
 		}

@@ -1,6 +1,8 @@
 package kv
 
-import "github.com/spaghetti-lover/go-db/internal/storage/index/bptree_disk"
+import (
+	"github.com/spaghetti-lover/go-db/internal/storage/index/bptree_disk"
+)
 
 type BPTreeEngine struct {
 	Tree *bptree_disk.BPlusTree

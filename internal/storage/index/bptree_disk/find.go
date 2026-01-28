@@ -1,6 +1,8 @@
 package bptree_disk
 
-import "github.com/spaghetti-lover/go-db/internal/storage/disk"
+import (
+	"github.com/spaghetti-lover/go-db/internal/storage/disk"
+)
 
 func (t *BPlusTree) Find(key []byte) (*disk.KeyVal, error) {
 	currPID, err := t.rootPID()

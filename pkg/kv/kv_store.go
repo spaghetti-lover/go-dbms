@@ -1,6 +1,9 @@
 package kv
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type KVEngine interface {
 	Get(key []byte) ([]byte, bool)
@@ -13,6 +16,11 @@ type KVEngine interface {
 type KV struct {
 	Filename string
 	Engine   KVEngine
+
+	// Transaction support
+	mu      sync.RWMutex  // Thread safety
+	version uint64        // Current version counter
+	history []CommittedTX // History for conflict detection
 }
 
 func NewKV(engine KVEngine) *KV {

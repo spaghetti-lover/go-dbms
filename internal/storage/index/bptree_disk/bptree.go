@@ -122,9 +122,7 @@ func (t *BPlusTree) SeekGE(key []byte) *BIter {
 		return &BIter{valid: false}
 	}
 
-	kv := &disk.KeyEntry{
-		KeyLen: uint16(len(key)),
-	}
+	kv := disk.NewKeyEntryFromBytes(key)
 
 	disk.RightAlignCopy(kv.Key[:], key)
 
@@ -141,7 +139,7 @@ func (t *BPlusTree) SeekGE(key []byte) *BIter {
 
 			idx := 0
 			for idx < int(leaf.NKV) {
-				entry := &disk.KeyEntry{KeyLen: leaf.KVs[idx].KeyLen, Key: leaf.KVs[idx].Key}
+				entry := disk.NewKeyEntryFromKeyVal(&leaf.KVs[idx])
 				if entry.Compare(kv) >= 0 {
 					break
 				}

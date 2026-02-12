@@ -64,6 +64,10 @@ func (p *Pager) FlushPage(pageID uint64) error {
 	return err
 }
 
+func (p *Pager) Sync() error {
+	return p.file.Sync()
+}
+
 // FreePage releases a page ID and removes it from cache
 func (p *Pager) FreePage(pageID uint64) {
 	delete(p.cache, pageID)

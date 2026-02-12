@@ -42,8 +42,8 @@ func TestBPlusTree_Delete_Simple(t *testing.T) {
 
 	// insert
 	for i := 1; i <= 5; i++ {
-		k, v := kv(i)
-		require.NoError(t, tree.Insert(k, v))
+		kV := disk.NewKeyValFromInt(int64(i), int64(i))
+		require.NoError(t, tree.Insert(kV.Key[:], kV.Val[:]))
 	}
 
 	// delete
@@ -79,8 +79,8 @@ func TestBPlusTree_Delete_MergeAndRootShrink(t *testing.T) {
 	// Insert multiple keys to cause splits
 	numInserts := 20
 	for i := 1; i <= numInserts+1; i++ {
-		k, v := kv(i)
-		require.NoError(t, tree.Insert(k, v))
+		Kv := disk.NewKeyValFromInt(int64(i), int64(i))
+		require.NoError(t, tree.Insert(Kv.Key[:], Kv.Val[:]))
 	}
 
 	// Delete keys to cause merges and root shrink

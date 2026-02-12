@@ -11,21 +11,21 @@ var ErrDuplicateKey = fmt.Errorf("duplicate key")
 
 func (t *BPlusTree) Insert(key, value []byte) error {
 	kv := disk.NewKeyValFromBytes(key, value)
-	keyEntry := disk.KeyEntry{Key: kv.Key}
+	keyEntry := disk.NewKeyEntryFromKeyVal(&kv)
 
 	rootPID, err := t.rootPID()
 	if err != nil {
 		return err
 	}
 
-	res, err := t.insertRecursive(rootPID, &keyEntry, &kv)
+	res, err := t.insertRecursive(rootPID, keyEntry, &kv)
 	if err != nil {
 		return err
 	}
 
-	// Root không split → done
+	// Root does not split → done
 	if !res.Split {
-		return nil
+		return t.pager.Sync()
 	}
 
 	// Root split → create new root
@@ -49,7 +49,11 @@ func (t *BPlusTree) Insert(key, value []byte) error {
 		return err
 	}
 
-	return t.setRootPID(newRootPID)
+	if err := t.setRootPID(newRootPID); err != nil {
+		return err
+	}
+
+	return t.pager.Sync()
 }
 
 func (t *BPlusTree) insertRecursive(nodePID uint64, key *disk.KeyEntry, kv *disk.KeyVal) (InsertResult, error) {

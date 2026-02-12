@@ -77,7 +77,7 @@ func (p *LeafPage) LowerBound(key *KeyEntry) int {
 	l, r := 0, int(p.NKV)
 	for l < r {
 		m := (l + r) / 2
-		entry := KeyEntry{KeyLen: p.KVs[m].KeyLen, Key: p.KVs[m].Key}
+		entry := NewKeyEntryFromKeyVal(&p.KVs[m])
 		if entry.Compare(key) < 0 {
 			l = m + 1
 		} else {
@@ -92,7 +92,7 @@ func (p *LeafPage) InsertKV(kv *KeyVal) bool {
 	if p.NKV >= LEAF_MAX_KV {
 		return false
 	}
-	pos := p.LowerBound(&KeyEntry{Key: kv.Key})
+	pos := p.LowerBound(NewKeyEntryFromKeyVal(kv))
 
 	for i := int(p.NKV); i > pos; i-- {
 		p.KVs[i] = p.KVs[i-1]
@@ -100,19 +100,6 @@ func (p *LeafPage) InsertKV(kv *KeyVal) bool {
 	p.KVs[pos] = *kv
 	p.NKV++
 	return true
-}
-
-// Delete a key val from Leaf Node
-// Assume always able to find exact
-func (p *LeafPage) DelKV(kv *KeyVal) {
-	pos := p.FindLastLE(kv)
-
-	for i := pos; i < int(p.NKV)-1; i++ {
-		p.KVs[i] = p.KVs[i+1]
-	}
-
-	p.KVs[p.NKV-1] = KeyVal{}
-	p.NKV--
 }
 
 // Split a node into 2 equal part
@@ -126,10 +113,7 @@ func (p *LeafPage) Split() (*LeafPage, *KeyEntry) {
 		p.KVs[mid+i] = KeyVal{}
 	}
 	p.NKV = uint16(mid)
-	sep := &KeyEntry{
-		KeyLen: newLeaf.KVs[0].KeyLen,
-		Key:    newLeaf.KVs[0].Key,
-	}
+	sep := NewKeyEntryFromKeyVal(&newLeaf.KVs[0])
 	return newLeaf, sep
 }
 
@@ -141,10 +125,10 @@ func (p *LeafPage) IsOverflow() bool {
 	return p.NKV > LEAF_MAX_KV
 }
 
-func (p *LeafPage) Delete(key *KeyEntry) bool {
+func (p *LeafPage) DelKey(key *KeyEntry) bool {
 	pos := -1
 	for i := 0; i < int(p.NKV); i++ {
-		entry := &KeyEntry{KeyLen: p.KVs[i].KeyLen, Key: p.KVs[i].Key}
+		entry := NewKeyEntryFromKeyVal(&p.KVs[i])
 		if entry.Compare(key) == 0 {
 			pos = i
 			break

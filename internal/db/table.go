@@ -17,7 +17,7 @@ type TableDef struct {
 	Indexes []IndexDef
 }
 
-// Internal tables
+// MetaTable stores metadata of database (db_version, next_table_prefix, schema_version)
 var MetaTable = &TableDef{
 	Name:   "@meta",
 	Cols:   []string{"key", "value"},
@@ -26,6 +26,7 @@ var MetaTable = &TableDef{
 	Prefix: 1,
 }
 
+// TableCatalog stores schema definition of all user tables. It map table_name -> TableDef
 var TableCatalog = &TableDef{
 	Name:   "@table",
 	Cols:   []string{"name", "def"},

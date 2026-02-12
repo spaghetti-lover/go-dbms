@@ -37,10 +37,15 @@ func (t *BPlusTree) Set(key, value []byte) error {
 			return err
 		}
 
-		return t.setRootPID(newRootPID)
+		err := t.setRootPID(newRootPID)
+		if err != nil {
+			return err
+		}
+
+		return t.pager.Sync()
 	}
 
-	return nil
+	return t.pager.Sync()
 }
 
 func (t *BPlusTree) setRecursive(nodePID uint64, kv *disk.KeyVal) (InsertResult, error) {
@@ -105,10 +110,7 @@ func (t *BPlusTree) setRecursive(nodePID uint64, kv *disk.KeyVal) (InsertResult,
 
 	internal := node.(*disk.InternalPage)
 
-	keyEntry := &disk.KeyEntry{
-		KeyLen: kv.KeyLen,
-		Key:    kv.Key,
-	}
+	keyEntry := disk.NewKeyEntryFromKeyVal(kv)
 
 	idx := internal.FindLastLE(keyEntry)
 	childPID := internal.Children[idx+1]

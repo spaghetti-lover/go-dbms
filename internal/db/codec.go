@@ -120,6 +120,8 @@ func extractIndexedValues(idx *IndexDef, rec *Record) []Value {
 	return vals
 }
 
+// encodeIndexKey create secondary key mapped to primary key
+// | index prefix | secondary key index columns | primary key index columns |
 func encodeIndexKey(idx *IndexDef, rec *Record, pkVals []Value) []byte {
 	vals := extractIndexedValues(idx, rec)
 	vals = append(vals, pkVals...)
@@ -164,4 +166,41 @@ func extractPrimaryKeyFromIndexKey(idxKey []byte, tdef *TableDef) []byte {
 	}
 	pkVals := vals[len(vals)-int(tdef.PKeyN):]
 	return encodeKey(tdef.Prefix, pkVals)
+}
+
+// indexValuesChanged checks if indexed column values changed between old and new record
+func indexValuesChanged(idx *IndexDef, oldRec, newRec *Record) bool {
+	for _, col := range idx.Cols {
+		oldVal := getColumnValue(oldRec, col)
+		newVal := getColumnValue(newRec, col)
+
+		if !valuesEqual(oldVal, newVal) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getColumnValue(rec *Record, colName string) Value {
+	for i, col := range rec.Cols {
+		if col == colName {
+			return rec.Vals[i]
+		}
+	}
+	return Value{} // Not found
+}
+
+func valuesEqual(v1, v2 Value) bool {
+	if v1.Type != v2.Type {
+		return false
+	}
+	switch v1.Type {
+	case ValueInt64:
+		return v1.I64 == v2.I64
+	case ValueBytes:
+		return bytes.Equal(v1.Bytes, v2.Bytes)
+	default:
+		return false
+	}
 }

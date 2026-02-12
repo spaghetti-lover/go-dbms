@@ -12,12 +12,9 @@ func (t *BPlusTree) Del(key []byte) (bool, error) {
 		return false, err
 	}
 
-	keyEntry := disk.KeyEntry{
-		KeyLen: uint16(len(key)),
-	}
-	disk.RightAlignCopy(keyEntry.Key[:], key)
+	keyEntry := disk.NewKeyEntryFromBytes(key)
 
-	res, err := t.deleteRecursive(rootPID, &keyEntry)
+	res, err := t.deleteRecursive(rootPID, keyEntry)
 	if err != nil {
 		if err == disk.ErrKeyNotFound {
 			return false, nil
@@ -37,11 +34,18 @@ func (t *BPlusTree) Del(key []byte) (bool, error) {
 			internal := root.(*disk.InternalPage)
 			if internal.NKeys == 0 {
 				newRootPID := internal.Children[0]
+				t.pager.FreePage(rootPID)
+				if err := t.pager.Sync(); err != nil {
+					return false, err
+				}
 				return true, t.setRootPID(newRootPID)
 			}
 		}
 	}
 
+	if err := t.pager.Sync(); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -55,7 +59,7 @@ func (t *BPlusTree) deleteRecursive(nodePID uint64, key *disk.KeyEntry) (DeleteR
 	if node.IsLeaf() {
 		leaf := node.(*disk.LeafPage)
 
-		ok := leaf.Delete(key)
+		ok := leaf.DelKey(key)
 		if !ok {
 			return DeleteResult{}, disk.ErrKeyNotFound
 		}
@@ -68,7 +72,6 @@ func (t *BPlusTree) deleteRecursive(nodePID uint64, key *disk.KeyEntry) (DeleteR
 		if err := t.pager.FlushPage(nodePID); err != nil {
 			return DeleteResult{}, err
 		}
-
 		// no underflow
 		if leaf.NKV >= leaf.MinKeys() {
 			return DeleteResult{Underflow: false}, nil
@@ -297,10 +300,7 @@ func borrowFromLeftLeaf(left *disk.LeafPage, curr *disk.LeafPage, parent *disk.I
 
 	// 3. update separator key in parent
 	// separator = first key of curr
-	parent.Keys[parentKeyIdx] = disk.KeyEntry{
-		KeyLen: curr.KVs[0].KeyLen,
-		Key:    curr.KVs[0].Key,
-	}
+	parent.Keys[parentKeyIdx] = *disk.NewKeyEntryFromKeyVal(&curr.KVs[0])
 }
 func mergeInternal(parent *disk.InternalPage, idx int, left *disk.InternalPage, cur *disk.InternalPage) {
 	// 1. bring separator key down from parent to left
@@ -350,10 +350,7 @@ func borrowFromRightLeaf(curr *disk.LeafPage, right *disk.LeafPage, parent *disk
 
 	// 3. update separator key in parent
 	// separator = first key of right
-	parent.Keys[parentKeyIdx] = disk.KeyEntry{
-		KeyLen: right.KVs[0].KeyLen,
-		Key:    right.KVs[0].Key,
-	}
+	parent.Keys[parentKeyIdx] = *disk.NewKeyEntryFromKeyVal(&right.KVs[0])
 }
 
 func mergeLeaf(parent *disk.InternalPage, idx int, left *disk.LeafPage, cur *disk.LeafPage) {

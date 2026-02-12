@@ -13,6 +13,8 @@ type KeyEntry struct {
 	Key    [MAX_KEY_SIZE]byte
 }
 
+// input: 8
+// output: [MAX_KEY_SIZE]uint8 {0,0,...,0,0,0,8}
 func NewKeyEntryFromInt(v int64) *KeyEntry {
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], uint64(v))
@@ -26,8 +28,8 @@ func NewKeyEntryFromInt(v int64) *KeyEntry {
 	}
 }
 
-// our key: [0 0 0 0 255 255 1 2]
-// input  : [0 0 0 0 0 0 1 2]
+// input: []byte{0, 0, 0, 0, 255, 255, 1, 2}
+// output: [MAX_KEY_SIZE]uint8 {0,0,...,255,255,1,2}
 func NewKeyEntryFromBytes(input []byte) *KeyEntry {
 	var data [MAX_KEY_SIZE]byte
 	RightAlignCopy(data[:], input)
@@ -35,6 +37,13 @@ func NewKeyEntryFromBytes(input []byte) *KeyEntry {
 	return &KeyEntry{
 		KeyLen: uint16(len(input)),
 		Key:    data,
+	}
+}
+
+func NewKeyEntryFromKeyVal(kv *KeyVal) *KeyEntry {
+	return &KeyEntry{
+		KeyLen: kv.KeyLen,
+		Key:    kv.Key,
 	}
 }
 
@@ -59,12 +68,28 @@ func (k *KeyEntry) readFromBuffer(buf *bytes.Buffer) error {
 }
 
 func (k *KeyEntry) Compare(rhs *KeyEntry) int {
-	for i := 0; i < int(MAX_KEY_SIZE); i++ {
-		if k.Key[i] < rhs.Key[i] {
+	kStart := MAX_KEY_SIZE - int(k.KeyLen)
+	rStart := MAX_KEY_SIZE - int(rhs.KeyLen)
+	kSlice := k.Key[kStart:]
+	rSlice := rhs.Key[rStart:]
+
+	minLen := len(kSlice)
+	if len(rSlice) < minLen {
+		minLen = len(rSlice)
+	}
+	for i := 0; i < minLen; i++ {
+		if kSlice[i] < rSlice[i] {
 			return -1
-		} else if k.Key[i] > rhs.Key[i] {
+		} else if kSlice[i] > rSlice[i] {
 			return 1
 		}
+	}
+
+	// If equal, smaller length will be smaller
+	if len(kSlice) < len(rSlice) {
+		return -1
+	} else if len(kSlice) > len(rSlice) {
+		return 1
 	}
 	return 0
 }

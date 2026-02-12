@@ -114,5 +114,23 @@ func (kv *KeyVal) readFromBuffer(buf *bytes.Buffer) error {
 
 // Lexicographical compare (BigEndian sortable)
 func (kv *KeyVal) Compare(other *KeyVal) int {
-	return bytes.Compare(kv.Key[:], other.Key[:])
+	kSlice := kv.Key[MAX_KEY_SIZE-int(kv.KeyLen):]
+	oSlice := other.Key[MAX_KEY_SIZE-int(other.KeyLen):]
+	minLen := len(kSlice)
+	if len(oSlice) < minLen {
+		minLen = len(oSlice)
+	}
+	for i := 0; i < minLen; i++ {
+		if kSlice[i] < oSlice[i] {
+			return -1
+		} else if kSlice[i] > oSlice[i] {
+			return 1
+		}
+	}
+	if len(kSlice) < len(oSlice) {
+		return -1
+	} else if len(kSlice) > len(oSlice) {
+		return 1
+	}
+	return 0
 }

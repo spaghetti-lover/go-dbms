@@ -24,7 +24,7 @@ func (t *BPlusTree) Find(key []byte) (*disk.KeyVal, error) {
 
 			pos := leaf.FindLastLE(&searchKV)
 			if pos >= 0 && leaf.KVs[pos].Compare(&searchKV) == 0 {
-				kv := leaf.KVs[pos] // copy
+				kv := leaf.KVs[pos] // copy for consistency
 				return &kv, nil
 			}
 
@@ -33,10 +33,7 @@ func (t *BPlusTree) Find(key []byte) (*disk.KeyVal, error) {
 
 		// Internal
 		internal := node.(*disk.InternalPage)
-		pos := internal.FindLastLE(&disk.KeyEntry{
-			KeyLen: searchKV.KeyLen,
-			Key:    searchKV.Key,
-		})
+		pos := internal.FindLastLE(disk.NewKeyEntryFromKeyVal(&searchKV))
 
 		currPID = internal.Children[pos+1]
 	}

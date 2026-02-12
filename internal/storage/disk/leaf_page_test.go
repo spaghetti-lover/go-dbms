@@ -62,21 +62,6 @@ func TestLeafPage_FindLastLE(t *testing.T) {
 	assert.Equal(t, 2, leaf.FindLastLE(kv(30)))
 	assert.Equal(t, 2, leaf.FindLastLE(kv(40)))
 }
-
-func TestLeafPage_DelKV(t *testing.T) {
-	leaf := NewLeafPage()
-
-	leaf.InsertKV(kv(1))
-	leaf.InsertKV(kv(3))
-	leaf.InsertKV(kv(5))
-
-	leaf.DelKV(kv(3))
-
-	assert.Equal(t, uint16(2), leaf.NKV)
-	assert.Equal(t, 0, leaf.KVs[0].Compare(kv(1)))
-	assert.Equal(t, 0, leaf.KVs[1].Compare(kv(5)))
-}
-
 func TestLeafPage_Split(t *testing.T) {
 	leaf := NewLeafPage()
 
@@ -98,7 +83,7 @@ func TestLeafPage_Split(t *testing.T) {
 	assert.Equal(t, 0, right.KVs[1].Compare(kv(4)))
 
 	// promote key = first key of right leaf
-	assert.Equal(t, 0, promoteKey.Compare(&KeyEntry{Key: right.KVs[0].Key}))
+	assert.Equal(t, 0, promoteKey.Compare(NewKeyEntryFromKeyVal(&right.KVs[0])))
 }
 
 func TestLeafPage_Serialization(t *testing.T) {

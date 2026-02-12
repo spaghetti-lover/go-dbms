@@ -35,14 +35,36 @@
 
 ### Feature
 
-- Query Cache
-- Query Parser
-- Query Optimizer
-- Local Execution
-- Transaction Manager
-- Lock Manager
-- Access Method (B+ Tree, LSM Tree)
-- Recovery Manager (WAL)
+#### Engine
+
+- B+ Tree index
+- B+ Tree disk
+- KV storage on top of B+ Tree
+
+#### Data organization
+
+- Schemas, tables, and records
+- Primary key
+- Secondary key
+- CRUD
+
+#### Query Processor
+
+- SQL Parser
+- Expression evaluation
+
+#### Transaction
+
+#### Concurrency
+
+- Lock and control
+- Snapshot isolation
+- Write conflict
+
+#### Query language
+
+- SQL parser
+- Expression evaluation
 
 # Access Method / Indexing Data Structure
 
@@ -114,22 +136,6 @@ To do that, we have the following data structures:
 ### When
 
 - Read heavy workload with occasional update: OLTP
-
-### How
-
-- Internal node: [bptree.go](/internal/storage/index/bptree.go)
-- Leaf node: [bptree.go](/internal/storage/index/bptree.go)
-- Insert function: [bptree.go](/internal/storage/index/bptree.go)
-
-- Header
-- MetaPage
-- KeyEntry
-- InternalPage
-- Leaf
-- Page Allocator
-- Get / Set
-- Del
-- File Allocator with reuse
 
 ## LSM Tree (Log-Structured Merge Tree)
 
@@ -223,134 +229,148 @@ To do that, we have the following data structures:
 └──────────────────────────┘
 ```
 
-- Internal page:
-  - Keys right now is int, need to change to support bytes
-  - Children is an array of pointer -> u64
-  - Need a header that store the data type + next node
-    ![alt text](image-3.png)
+- Header
 
-- Leaf page:
-  - KeyVal struct:
+```go
+type PageHeader struct {
+	PageType        uint8
+	NextPagePointer uint64
+}
 
-    ```Go
-    type KeyVal struct {
-      keyLen uint16
-      valLen uint16
-      keys   [MAX_KEY_SIZE]uint8 // BigEndian storage
-      vals   [MAX_KEY_SIZE]uint8 // BigEndian storage
-    }
-    ```
+func (h *PageHeader) WriteToBuffer(buf *bytes.Buffer) error
+func (h *PageHeader) ReadFromBuffer(buf *bytes.Buffer) error
+```
 
-    For simplicity, I can use only array keys and vals but i think using the KeyVal struct will simplify the process of tracking keys and vals at the same time
+- MetaPage
 
-  - `writeToBuffer` and `readFromBuffer` function is used to serialize / deserialize data into binary format at buffer
+```go
+const META_MAGIC uint32 = 0xDBDBDBDB
 
-    ```
-    // Write
-    PUT(key, val)
-      ↓
-    insert into B+Tree
-      ↓
-    KeyVal.writeToBuffer(pageBuffer)
-      ↓
-    flush page to disk
-    ```
+type MetaPage struct {
+	Header  PageHeader
+	Magic  uint32
+	RootPID uint64
+}
 
-    ```
-    read page from disk
-      ↓
-    KeyVal.readFromBuffer(pageBuffer)
-      ↓
-    use key/value in query
-    ```
+func (p *MetaPage) WriteToBuffer(buf *bytes.Buffer) error
+func (p *MetaPage) ReadFromBuffer(buf *bytes.Buffer) error
+```
 
-- Page Allocator:
-  - What: function return pointer to write data to
+- Internal page
 
-  - Why:
-    - We know where is EOF to allocate data
+```go
+type InternalPage struct {
+	Header   PageHeader
+	NKeys    uint16
+	Keys     [MAX_INTERNAL_KEYS]KeyEntry
+	Children [MAX_INTERNAL_CHILDREN]uint64
+}
+func (p *InternalPage) WriteToBuffer(buffer *bytes.Buffer) error
+func (p *InternalPage) ReadFromBuffer(buffer *bytes.Buffer, isReadHeader bool) error
+func (n *InternalPage) Split() (*InternalPage, *KeyEntry)
+func (n *InternalPage) InsertKV(key *KeyEntry, rightChild uint64)
+```
 
-- InsertResult:
-  - What:
-    - `nodePointer`: pointer (offset) to current node after inserting (or splitting)
-    - `nodePromotionKey`: first key (smallest key) of the node
-    - `newNodePointer`: if node is splited, this pointer will point to the new node
-    - `newPromotionKey`: if node is splited, this key is the first key of new node and pushed to parent
+- KeyEntry
 
-  - Why: Transmit info of insert result to parent in order to update B+ Tree
+```go
+type KeyEntry struct {
+	KeyLen uint16
+	Key    [MAX_KEY_SIZE]byte
+}
 
-- `readBlockAtPointer`
-  - What: Funciton read a block of data (4096 bytes) from a file at a specified pointer (offset) into a buffer.
-  - Why: To efficiently access any page (node) in the B+ Tree stored on disk, enabling reading of internal, leaf, or meta page as needed for tree operations
-  - How:
-    1. Resets the buffer
-    2. Creates a 4096-byte slice
-    3. Uses `file.ReadAt(data, int64(pointer))` to read exactly 4096 bytes from the file at the given offset
-    4. Writes the data into the buffer for further processing
+func (k *KeyEntry) writeToBuffer(buf *bytes.Buffer) error
+func (k *KeyEntry) readFromBuffer(buf *bytes.Buffer) error
+```
 
-- Insert recursive function:
+- KeyVal
 
-  ```
-  FUNCTION InsertRecursive(node, key, keyValue):
+```go
+type KeyVal struct {
+	KeyLen uint16
+	ValLen uint16
+	Key    [MAX_KEY_SIZE]uint8 // BigEndian storage
+	Val    [MAX_VAL_SIZE]uint8 // BigEndian storage
+}
 
-    IF node is InternalPage:
+func (kv *KeyVal) writeToBuffer(buf *bytes.Buffer) error
+func (kv *KeyVal) readFromBuffer(buf *bytes.Buffer) error
+```
 
-        pos ← find child index where node.keys[pos] ≤ key
+- Leaf page
 
-        IF node is empty:
-            leaf ← new LeafPage
-            leaf.insert(keyValue)
-            leafPtr ← write leaf to disk
-            node.insert(key, leafPtr)
-            RETURN result(node)
+```go
+type LeafPage struct {
+	Header PageHeader
+	NKV    uint16
+	KVs    [LEAF_MAX_KV]KeyVal
+}
 
-        IF pos == -1:
-            pos ← 0
+func (p *LeafPage) WriteToBuffer(buf *bytes.Buffer) error
+func (p *LeafPage) ReadFromBuffer(buf *bytes.Buffer, readHeader bool) error
+func (p *LeafPage) InsertKV(kv *KeyVal) bool
+func (p *LeafPage) Split() (*LeafPage, *KeyEntry)
+func (p *LeafPage) DelKey(key *KeyEntry) bool
+```
 
-        childPtr ← node.children[pos]
-        child ← read page from disk at childPtr
+- File Allocator
 
-        result ← InsertRecursive(child, key, keyValue)
+```go
+type FileAllocator struct {
+	nextBlockID uint64   // Next never-used block ID
+	freeList    []uint64 // Reusable block IDs
+}
 
-        node.keys[pos] ← result.promotedKey
-        node.children[pos] ← result.nodePtr
+func (a *FileAllocator) Allocate() uint64
+func (a *FileAllocator) Free(blockID uint64)
+func BlockOffset(blockID uint64) uint64
+func (a *FileAllocator) WriteToFile(file *os.File) error
+func LoadFileAllocator(file *os.File) (*FileAllocator, error)
 
-        IF result.newNodePtr exists:
-            node.insert(result.newPromotedKey, result.newNodePtr)
+func (a *FileAllocator) WriteToFile(file *os.File) error
+func LoadFileAllocator(file *os.File) (*FileAllocator, error)
+```
 
-        IF node is full:
-            newNode ← split node
-            oldPtr ← write node to disk
-            newPtr ← write newNode to disk
-            RETURN (oldPtr, promote(node), newPtr, promote(newNode))
-        ELSE:
-            ptr ← write node to disk
-            RETURN (ptr, promote(node), null)
+- Page Allocator
 
-    ELSE:  // node is LeafPage
+```go
+type Pager struct {
+	file      *os.File
+	allocator *FileAllocator
+	cache     map[uint64][]byte // pageID -> page buffer
+}
 
-        node.insert(keyValue)
+func (p *Pager) FetchPage(pageID uint64) ([]byte, error)
+func (p *Pager) FlushPage(pageID uint64) error
+func (p *Pager) FreePage(pageID uint64)
+```
 
-        IF node is full:
-            newLeaf ← split node
-            oldPtr ← write node to disk
-            newPtr ← write newLeaf to disk
-            RETURN (oldPtr, firstKey(node), newPtr, firstKey(newLeaf))
-        ELSE:
-            ptr ← write node to disk
-            RETURN (ptr, firstKey(node), null)
+- Find
 
-  ```
+```go
+func (t *BPlusTree) Find(key []byte) (*disk.KeyVal, error)
+```
 
-- Insert function:
-  - What:
-    - Add a key-value pair to the disk-based B+Tree
-    - Handle file access
-    - Read/write page
-    - Update tree structure as needed
+- Insert
 
-  - Why:
-    - Persistently store new data in B+ Tree index
+```go
+func (t *BPlusTree) Insert(key, value []byte) error
+func (t *BPlusTree) insertRecursive(nodePID uint64, key *disk.KeyEntry, kv *disk.KeyVal) (InsertResult, error)
+```
+
+- Set
+
+```go
+func (t *BPlusTree) Set(key, value []byte) error
+func (t *BPlusTree) setRecursive(nodePID uint64, kv *disk.KeyVal) (InsertResult, error)
+```
+
+- Delete
+
+```go
+func (t *BPlusTree) Del(key []byte) (bool, error)
+func (t *BPlusTree) deleteRecursive(nodePID uint64, key *disk.KeyEntry) (DeleteResult, error)
+```
 
 ![alt text](image-4.png)
 
@@ -362,6 +382,8 @@ To do that, we have the following data structures:
   - Range query: Find rows by a range; iterate the result in sorted order
 
 ## Primary key
+
+### Design
 
 - How to encode a row as a KeyValue?
   - How to define primary key?
@@ -390,6 +412,17 @@ To do that, we have the following data structures:
 
   Use the same table and point secondary indexed key to primary key
 
+### How
+
+```go
+// Index definition
+type IndexDef struct {
+	Name   string
+	Cols   []string
+	Prefix uint8
+}
+```
+
 ## Schemas
 
 - How to encode multiple table?
@@ -398,72 +431,228 @@ To do that, we have the following data structures:
   - Option 1: Multiple KV stores
   - Option 2: 1 KV store, different prefix
 
+  => Option 2 for lowering cost of initilize KV store
+
 ## Tables
+
+```go
+// Table definition (schema)
+type TableDef struct {
+	Name    string
+	Cols    []string
+	Types   []ValueType
+	PKeyN   int   // number of primary key columns
+	Prefix  uint8 // table prefix for key encoding
+	Indexes []IndexDef
+}
+
+// MetaTable stores metadata of database (db_version, next_table_prefix, schema_version)
+var MetaTable = &TableDef{
+	Name:   "@meta",
+	Cols:   []string{"key", "value"},
+	Types:  []ValueType{ValueBytes, ValueBytes},
+	PKeyN:  2,
+	Prefix: 1,
+}
+
+// TableCatalog stores schema definition of all user tables. It map table_name -> TableDef
+var TableCatalog = &TableDef{
+	Name:   "@table",
+	Cols:   []string{"name", "def"},
+	Types:  []ValueType{ValueBytes, ValueBytes},
+	PKeyN:  2,
+	Prefix: 2,
+}
+```
 
 ## Records
 
+```go
+type Value struct {
+	Type  ValueType
+	I64   int64
+	Bytes []byte
+}
+
+type Record struct {
+	Cols []string
+	Vals []Value
+}
+```
+
+## Decode / Encode schema
+
+- Layout: | prefix (1) | [ TYPE | LEN | DATA ]... |
+- TYPE: 1 byte
+- LEN : 4 bytes (uint32)
+- DATA:
+- bytes → raw
+- int64 → 8 bytes (big endian)
+
+```go
+func encodeKey(prefix uint8, vals []Value) []byte
+
+func encodeValue(vals []Value) []byte
+func decodeValue(data []byte) ([]Value, error)
+
+func extractIndexedValues(idx *IndexDef, rec *Record) []Value
+
+func decodeRecord(tdef *TableDef, key, val []byte) (*Record, error)
+```
+
 ## CRUD
+
+```go
+// Reorder record columns to match table definition
+func reorderRecord(tdef *TableDef, rec *Record) error
+
+func (db *DB) getByDef(tdef *TableDef, rec *Record) error
+func (db *DB) insertByDef(tdef *TableDef, rec *Record) error
+func (db *DB) updateByDef(tdef *TableDef, rec *Record) error
+func (db *DB) deleteByDef(tdef *TableDef, rec *Record) error
+
+func (db *DB) Get(table *TableDef, rec *Record) error
+func (db *DB) Insert(table *TableDef, rec *Record) error
+func (db *DB) Update(table *TableDef, rec *Record) error
+func (db *DB) Upsert(table *TableDef, rec *Record) error
+func (db *DB) Delete(table *TableDef, rec *Record) error
+```
 
 ## Range Query
 
-✅ Fix splitLeaf + mergeLeaf
+### B+ Tree iterator
 
-- Update nextPagePointer when leaf split
-- Update nextPagePointer when leaf merge
+```go
+// The stateful iterator BIter represents the position in a B+ tree
+type BIter struct {
+	tree    *BPlusTree
+	leafPID uint64
+	leaf    *disk.LeafPage
+	buf     []byte
+	idx     int
+	valid   bool
+}
 
-✅ BIter struct
+// SeekGE positions the iterator at the first key >= target key
+func (t *BPlusTree) SeekGE(key []byte) *BIter
+// get the current KV pair
+func (it *BIter) Deref() *disk.KeyVal
+// precondition of the Deref()
+func (iter *BIter) Valid() bool
+// moving forward
+func (iter *BIter) Next()
+```
 
-- What:
-  - `leafPID`: current page
-  - `leaf`: loaded leaf
-  - `idx`: current idx of leaf.KV
-  - `valid`: alive not not
+For example, the query for `a <= key` looks like this:
 
-- Why:
-  - To iterate over a range of keys in the B+ Tree efficiently
+```go
+func (b *BPlusTree) Scan(startKey, endKey []byte, fn func(key, val []byte) bool) error {
+	iter := b.SeekGE(startKey)
+	for iter.Valid() {
+		kv := iter.Deref()
+		if kv == nil {
+			break
+		}
+		if endKey != nil && bytes.Compare(kv.Key[:kv.KeyLen], endKey) > 0 {
+			break
+		}
+		if !fn(kv.Key[:kv.KeyLen], kv.Val[:kv.ValLen]) {
+			break
+		}
+		iter.Next()
+	}
+	return nil
+}
+```
 
-- How: Ensure invariants
-  - valid == true
-  - leaf != nil
-  - 0 <= idx < leaf.NKV
+### Order-preserving encoding
 
-✅ SeekGE
+Why
 
-- What: Move iterator to first key >= target key
-- Why: To start range scan from the desired key
-- How:
-  - Start from root, traverse down to leaf
-  - In each internal node, find child pointer where key <= target key
-  - In leaf node, find first key >= target key, set idx
+- B-tree indexes compare keys as byte strings.
+- Table columns have different data types (e.g., numbers or composite keys) with difference comparing order
 
-✅ Valid, Deref
+How
 
-- What:
-  - `Valid()`: Check if iterator is valid
-  - `Deref()`: Get current KeyVal
-- Why:
-  - To access current key-value and check iterator state
-- How:
-  - `Valid()`: return valid
-  - `Deref()`: return leaf.KVs[idx] if valid
+#### Option 1: Decode before comparing
 
-✅ Next
+- Poor performance
 
-- What: Move iterator to next key
-- Why: To iterate through keys sequentially
-- How:
-  - Increment idx
-  - If idx >= leaf.NKV, load next leaf using nextPagePointer
+#### Option 2: Specialize format (TODO)
 
-✅ DB.Scan
+- Number:
+  - Unsigned integer:
 
-- What: Perform range scan from startKey to endKey
-- Why: To retrieve all key-value pairs within a specified range
-- How:
-  - Use `SeekGE(startKey)` to position iterator
-  - Iterate using `Next()` until key >= endKey
+    To compare unsigned integers using bytes.Compare, encode them so that more significant bits appear first.
+    - Use big-endian encoding.
+    - Byte-by-byte comparison then matches numeric order.
+    - Example (uint64, big-endian):
+      ```
+      1    → 00 00 00 00 00 00 00 01
+      2    → 00 00 00 00 00 00 00 02
+      255  → 00 00 00 00 00 00 00 ff
+      ```
 
-✅ Test range scan
+  - Signed Integers:
+
+    Signed integers use two’s complement, where negative values appear larger when treated as unsigned bytes.
+    - Flip the most significant bit (sign bit).
+    - This remaps signed integers into an unsigned space with correct ordering.
+
+    ```go
+    var buf [8]byte
+    u := uint64(v) ^ (1 << 63) // flip sign bit
+    binary.BigEndian.PutUint64(buf[:], u)
+    ```
+
+- String:
+
+* Option 1: Decoding
+  - Poor performance
+
+* Option 2: Delimiter-based encoding (preferred)
+  - Append a terminator byte to each string (e.g., 0x00)
+  - For example:
+    ```arudino
+    ("a", "bc") → a\x00bc\x00
+    ("ab", "c") → ab\x00c\x00
+    ```
+
+* Option 3: Escaping Delimiters
+  - Input strings may contain the delimiter byte.
+  - To avoid ambiguity:
+    - Use 0x01 as an escape byte
+    - Apply these transformations:
+      ```
+      0x00 → 0x01 0x01
+      0x01 → 0x01 0x02
+      ```
+
+### Scanner
+
+#### What
+
+- `Scanner` is a wrapper of the `B+tree` iterator. It decodes KVs into rows.
+
+#### How
+
+```go
+type Scanner struct {
+	iter     *bptree_disk.BIter
+	db       *DB
+	tableDef *TableDef
+	indexDef *IndexDef // nil = primary scan
+	startKey []byte    // prefix for validation
+	endKey   []byte    // nil = no upper bound
+}
+
+// within the range or not?
+func (s *Scanner) Valid() bool
+func (s *Scanner) Next()
+func (s *Scanner) Deref() (*Record, error)
+
+func (db *DB) Scan(table string, startRec, endRec *Record, fn func(rec *Record) bool) error
+```
 
 ## Secondary index
 
@@ -505,7 +694,7 @@ To do that, we have the following data structures:
 ### Option 3:
 
 - What:
-  - Trống trùng bằng cách thêm primary key vào secondary key
+  - Avoid duplication by adding primary key to secondary key
 
 - How:
   - IndexDef + metadata
@@ -550,6 +739,7 @@ To do that, we have the following data structures:
     - What: Provide a way to scan index entries
     - Why: Support index-based queries
     - How:
+
       ```go
       type Scanner struct {
         iter     *BIter
@@ -559,6 +749,7 @@ To do that, we have the following data structures:
         db       *DB
       }
       ```
+
       - Implement `Scan(startKey, endKey)` in B+Tree
       - Use iterator to traverse index entries in range
 
@@ -568,7 +759,56 @@ To do that, we have the following data structures:
     - Update indexed col → index changed
     - Update non-index col → index unchanged
 
-# Transaction
+### Secondary Index Updates with multi-key operations (TODO)
+
+Why:
+
+- When updating a row with many B-Tree keys (primary + secondary indexes), we need to:
+  - Delete old index keys
+  - Add new index keys
+
+=> we need to know old index key
+
+How:
+
+```go
+type UpdatedRec struct {
+    tree  *BTree
+    Added bool    // đã thêm key mới chưa
+    Updated bool  // đã thêm key mới HOẶC key cũ đã thay đổi
+    Old   []byte  // giá trị TRƯỚC khi update
+    Key   []byte  // key hiện tại
+    Val   []byte  // value hiện tại
+    Mode  int
+}
+
+func dbUpdate(db *DB, tdef *TableDef, rec Record, mode int) (bool, error) {
+    // 1. Insert row mới
+    req := UpdatedRec{Key: key, Val: val, Mode: mode}
+    if _, err := db.kv.Update(&req); err != nil {
+        return false, err
+    }
+
+    // 2. Maintain secondary indexes
+    if req.Updated && !req.Added {
+        // Dùng req.Old để xóa các old indexed keys
+    }
+
+    if req.Updated {
+        // Thêm các new indexed keys
+    }
+
+    return req.Updated, nil
+}
+```
+
+### Note
+
+- Atomicity Problem:
+  - Each KV operation
+
+# Transaction (TODO)
+
 - Copy-on-write is not enough to ensure Atomicity
 
   ![alt text](image-10.png)
@@ -576,35 +816,95 @@ To do that, we have the following data structures:
   Because transaction have many operations beside 1 update (many updates)
 
 - KVTX struct:
+
   ```go
+  // KVTX represents a transaction on the KV store
   type KVTX struct {
-    db *KV
-    meta []byte //for the rollback
-
-    // Concurrency control
-    snapshot []byte
-    pending []byte
+    kv      *KV
+    meta    []byte               // for rollback
+    version uint64               // version when TX started
+    pending map[string]pendingOp // pending writes in this TX
+    reads   []StoreKey           // keys read (for conflict detection)
+    aborted bool                 // whether TX was aborted
   }
-
   // begin a transaction
   func (kv *KV) Begin(tx *KVTX)
-
   // end a transaction: commit updates; rollback on error
-  func (kv *KV) Commit(tx *KVTX) error {
-    return nil
-  }
+  func (kv *KV) Commit(tx *KVTX) error
+  func (kv *KV) Abort(tx *KVTX)
 
-  func (kv *KV) Abort(tx *KVTX) {
-    writeMetaToDisk(tx.kv, tx.meta)
-  }
-
-  func (tx *KVTX) Get(key []byte) ([]byte, bool) {
-    
-  }
+  func (tx *KVTX) Get(key []byte) ([]byte, bool)
   ```
+
 ## Atomicity
 
 ![alt text](image-12.png)
+
+### How
+
+#### Option 1: Copy-on-write
+
+- Every (insert/update) don't upsert to the old data
+- Alternatively:
+  - Create a copy of changed node
+  - Commit: change root pointer to new tree
+  - Rollback: hold the old root pointer
+
+=> Root pointer is single source of truth
+
+#### Option 2: Write-Ahead Log (WAL)
+
+- Updates are done in place on existing data pages
+- Before modifying data pages:
+  - Append change records to a log (WAL)
+  - `fsync(log)` first
+- Commit
+- Rollback / Crash recovery: use WAL
+- Data pages can be flushed later (async)
+
+=> WAL is single source of truth
+
+Choose option 1 for simplicity
+
+```go
+func (tx *KVTX) Seek(key []byte, cmp int) *BIter
+func (tx *KVTX) Update(req *UpdateReq) bool
+func (tx *KVTX) Del(req *DeleteReq) bool
+
+type DBTX struct {
+  kv KVTX
+  db *DB
+}
+
+func (db *DB) Begin(tx *DBTX)
+func (db *DB) Commit(tx *DBTX) error
+func (db *DB) Abort(tx *DBTX)
+
+func (tx *DBTX) Scan(table string, req *Scanner) error
+func (tx *DBTX) Set(table string, rec Record, mode int) (bool, error)
+func (tx *DBTX) Delete(table string, rec Record) (bool, error)
+```
+
+### Optimize
+
+#### Reduce copying on multi-key updates
+
+- Mark copied nodes
+- Update in-place those copied nodes
+- Update root pointer then `COMMIT`
+
+#### Range delete
+
+- Xác định range leaf nodes
+- Giải phóng (free) cả leaf node
+- Không cần đọc từng key
+- Không cần update intermediate nodes nhiều lần
+
+#### Compress common prefixes
+
+- Trong 1 node:
+  - Lưu prefix chung 1 lần
+  - Mỗi key chỉ lưu phần suffix
 
 ## Durability
 
@@ -618,7 +918,8 @@ To do that, we have the following data structures:
 
 ![alt text](image-14.png)
 
-# Concurrency
+# Concurrency (TODO)
+
 ![alt text](image-20.png)
 ![alt text](image-15.png)
 ![alt text](image-16.png)
@@ -627,42 +928,130 @@ To do that, we have the following data structures:
 ![alt text](image-19.png)
 ![alt text](image-21.png)
 
-```go
-// History and conflict detection
-type StoreKey struct {
-  key []byte
-}
+## What
 
-type CommittedTX struct {
-  version uint64
-  writes []StoreKey
-}
+![alt text](image-42.png)
 
-func detectConflict(tx *KVTX, key []byte) bool {
-  for i := len(kv.history) - 1; i >= 0; i-- {
-    if !versionBefore(tx.version, kv.history[i].version) {
-      break
-    }
+### Readers-writer lock (RWLock)
 
-    if rangesOverlap(kv.history[i].writes, key) {
-      return true
-    }
-  } 
-  return false
-}
+Why:
+
+- Pros:
+  - Concurrent reads
+
+- Cons:
+  - No concurrency between writes
+  - Long-running TXs are bad because readers and writers block each other.
+
+How:
+
+- If there’s no writer, nothing can be changed, concurrent readers are OK.
+- When a writer wants to enter, it waits until all readers have left.
+- Readers are blocked by a writer, but not by other readers.
+
+### Read-copy update (RCU)
+
+What: we can make
+readers and writers work on their own version of the data
+
+Why:
+
+- Pros:
+  - Prevent readers and writers from blocking each other,
+
+- Cons:
+  - Only allow 1 writer at a time
+
+How:
+
+- There is a pointer to immutable data, reader just grab it as a snapshot
+- A single writer updates its own copy, then flips the pointer to it
+
+### Optimistic concurrency control (preffered)
+
+What: One way to deal with conflicts is to just abort TX when a conflict is detected.
+
+Why:
+
+- Pros: Allow multiple readers and writers
+- Cons: Slow when there are many conflicts
+
+How:
+
+- TX starts
+- Reads are on the snapshot, but writers are buffered locally
+- Before committing, verify that there are no conflicts with committed TXs.
+- TX ends:
+  - If there's a conflict, abort and rollback
+  - Otherwise, transfer buffered writes to the DB
+
+### Pessimistic concurrency control
+
+What: TXs will acquire locks on their dependencies so
+that potentially conflicting TXs will wait for each other
+
+Why:
+
+- Pros:
+  - TXs can still progress even in conflicts
+
+- Cons:
+  - Deadlock (can solve but it is a hard graph problem)
+
+## Snapshot isolation
+
+# SQL Parser
+
+## Syntax, parser, and interpreter
+
+### What
+
+- SQL is encoded into tree structure
+  - Example 1: SELECT ... FROM foo WHERE a > b AND a < c:
+
+    ```
+    select
+    /  |  \
+    columns  table  condition
+    ...      foo       and
+                      /   \
+                    >
+                    / \   / \
+                  a   b a   c
+    ```
+
+  - Example 2: Expression a + b \* c:
+    ```
+        +
+      / \
+      a   *
+        / \
+        b   c
+    ```
+
+  => All can be expressed by: SQL, PRQL, S-expression
+
+## Query language specification
+
+### Statements
+
+Not exactly SQL, just a look-alike.
+
+```sql
+create table table_name (
+  a type1,
+  b type2,
+  ...
+  index (c, b, a),
+  index (d, e, f),
+
+  select expr... from table_name conditions limit x, y;
+  insert into table_name (cols...) values (a, b, c)...;
+  delete from table_name conditions limit x, y;
+  update table_name set a = expr, b = expr, ... conditions limit x, y;
+)
 ```
 
-- Snapshot style update
-- Transaction interface
-  - Begin by storing interface
-  - Concurrency control with reading back you own write
+### 
 
-# Isolation level
-- Read Uncommitted
-- Read Committed
-- Repeatable Read
-- Serializable
-
-=> We will implement Repeatable Read
-
-# Query Language
+### Conditions

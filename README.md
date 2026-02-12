@@ -96,23 +96,27 @@ go run cmd/benchmark/main.go
 - [x] WAL (redo-only)
 
 ### Data Model
+
 - [x] Schema & record layout
 - [x] Primary index
 - [x] Secondary index
 - [x] Range scan
 
 ### Query Layer
+
 - [x] Table operations (INSERT / DELETE / UPDATE / SELECT)
 - [x] Simple SQL parser
 - [x] REPL
 
-
 <a name="todo"></a>
 
 ## TODO
+
 - [ ] Extended REPL
 - [ ] Extended SQL grammar
 - [ ] Transaction & Concurrency control
+- [ ] Order preserving format (for range query and secondary index)
+- [ ] Secondary Index Updates with multi-key operations
 
 <a name="license"></a>
 
